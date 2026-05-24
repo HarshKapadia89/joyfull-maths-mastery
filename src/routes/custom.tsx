@@ -69,11 +69,19 @@ function CustomPage() {
           const res = await generate({
             data: { grade, chapterTitle: c.title, count: perChapter },
           });
-          return res.questions.map((q) => ({
-            ...(q as QuizQuestion),
-            _chapterId: c.id,
-            _chapterTitle: c.title,
-          })) as RunnerQ[];
+          return res.questions
+            .filter(
+              (q) =>
+                q.type === "mcq" &&
+                Array.isArray(q.options) &&
+                q.options.length === 4 &&
+                q.options.includes(q.answer),
+            )
+            .map((q) => ({
+              ...(q as QuizQuestion),
+              _chapterId: c.id,
+              _chapterTitle: c.title,
+            })) as RunnerQ[];
         }),
       );
       const merged = shuffle(batches.flat()).slice(0, count);
