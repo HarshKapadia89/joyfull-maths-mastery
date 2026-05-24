@@ -64,6 +64,8 @@ function ChapterQuiz() {
   const { recordChapterResult } = useProgress();
   const generate = useServerFn(generateChapterQuiz);
   const queryClient = useQueryClient();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const cacheKey = `${CACHE_PREFIX}${grade}-${cId}`;
   const queryKey = ["chapter-quiz", grade, cId] as const;
