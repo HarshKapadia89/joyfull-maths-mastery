@@ -305,12 +305,10 @@ function renderConceptCards(doc: jsPDF, cards: ConceptCard[], chapterTitle: stri
 
     // shadow
     doc.setFillColor(0, 0, 0);
-    // @ts-expect-error
-    const GState = doc.GState;
+    const GState = (doc as unknown as { GState?: new (o: { opacity: number }) => unknown }).GState;
     doc.saveGraphicsState();
     if (GState) {
-      // @ts-expect-error
-      doc.setGState(new GState({ opacity: 0.06 }));
+      (doc as unknown as { setGState: (s: unknown) => void }).setGState(new GState({ opacity: 0.06 }));
     }
     doc.roundedRect(x + 0.8, y + 1.2, colW, cardH, 3, 3, "F");
     doc.restoreGraphicsState();
