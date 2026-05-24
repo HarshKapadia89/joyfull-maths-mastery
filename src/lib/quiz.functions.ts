@@ -72,14 +72,14 @@ async function callAI(opts: {
   return JSON.parse(args);
 }
 
-async function callAIText(systemPrompt: string, userPrompt: string) {
+async function callAIText(systemPrompt: string, userPrompt: string, model?: string) {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured");
   const res = await fetch(AI_URL, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: MODEL,
+      model: model ?? MODEL,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
