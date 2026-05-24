@@ -26,7 +26,7 @@ async function callAI(opts: {
   if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured");
 
   const body = {
-    model: "google/gemini-3-flash-preview",
+    model: "google/gemini-2.5-flash-lite",
     messages: [
       { role: "system", content: opts.systemPrompt },
       { role: "user", content: opts.userPrompt },
@@ -173,7 +173,7 @@ export const askTutor = createServerFn({ method: "POST" })
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash-lite",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: data.question },

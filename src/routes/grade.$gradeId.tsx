@@ -1,8 +1,13 @@
 import { createFileRoute, Link, Outlet, notFound, useMatchRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Star, Play } from "lucide-react";
 import { getChapters } from "@/data/ncert-maths";
 import { getTheme } from "@/data/grade-themes";
 import { useProgress } from "@/hooks/useProgress";
+import { generateChapterQuiz, type QuizQuestion } from "@/lib/quiz.functions";
+
+const CACHE_PREFIX = "hbk-quiz-cache-v1:";
 
 export const Route = createFileRoute("/grade/$gradeId")({
   beforeLoad: ({ params }) => {
@@ -32,8 +37,30 @@ function GradePage() {
     to: "/grade/$gradeId/chapter/$chapterId",
     fuzzy: true,
   });
+  const queryClient = useQueryClient();
+  const generate = useServerFn(generateChapterQuiz);
 
   if (onChildRoute) return <Outlet />;
+
+  function prefetch(chapterId: number, chapterTitle: string) {
+    const cacheKey = `${CACHE_PREFIX}${grade}-${chapterId}`;
+    const queryKey = ["chapter-quiz", grade, chapterId] as const;
+    if (queryClient.getQueryData(queryKey)) return;
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) return;
+    } catch { /* ignore */ }
+    queryClient.prefetchQuery({
+      queryKey,
+      queryFn: async () => {
+        const res = await generate({ data: { grade, chapterTitle, count: 25 } });
+        const qs = res.questions as QuizQuestion[];
+        try { localStorage.setItem(cacheKey, JSON.stringify(qs)); } catch { /* ignore */ }
+        return qs;
+      },
+      staleTime: Infinity,
+    });
+  }
 
 
   return (
@@ -60,6 +87,9 @@ function GradePage() {
               key={c.id}
               to="/grade/$gradeId/chapter/$chapterId"
               params={{ gradeId: String(grade), chapterId: String(c.id) }}
+              onMouseEnter={() => prefetch(c.id, c.title)}
+              onFocus={() => prefetch(c.id, c.title)}
+              onTouchStart={() => prefetch(c.id, c.title)}
               className="bg-card shadow-card hover:border-primary group flex items-center gap-4 rounded-2xl border-2 border-transparent p-4 transition"
             >
               <div className={`bg-gradient-to-br ${theme.gradient} flex h-12 w-12 shrink-0 items-center justify-center rounded-xl font-extrabold text-white`}>
