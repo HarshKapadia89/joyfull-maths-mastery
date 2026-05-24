@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { ArrowLeft, FileDown, Sparkles } from "lucide-react";
+import { ArrowLeft, CheckSquare, FileDown, Sparkles, Square } from "lucide-react";
 import { GRADE_THEMES } from "@/data/grade-themes";
 import { getChapters } from "@/data/ncert-maths";
 import { generateWorksheet, type WorksheetItem } from "@/lib/quiz.functions";
@@ -21,15 +21,38 @@ export const Route = createFileRoute("/worksheet")({
 function WorksheetPage() {
   const gen = useServerFn(generateWorksheet);
   const [grade, setGrade] = useState(5);
-  const [chapterId, setChapterId] = useState(1);
+  const [selectedIds, setSelectedIds] = useState<number[]>([1]);
   const [count, setCount] = useState(10);
   const [name, setName] = useState("");
   const [items, setItems] = useState<WorksheetItem[] | null>(null);
   const chapters = useMemo(() => getChapters(grade), [grade]);
-  const chapter = chapters.find((c) => c.id === chapterId) ?? chapters[0];
+
+  const selectedChapters = useMemo(
+    () => chapters.filter((c) => selectedIds.includes(c.id)),
+    [chapters, selectedIds],
+  );
+
+  const allSelected = selectedIds.length === chapters.length;
+  const someSelected = selectedIds.length > 0 && selectedIds.length < chapters.length;
+
+  const toggleChapter = (id: number) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+
+  const selectAll = () => setSelectedIds(chapters.map((c) => c.id));
+  const deselectAll = () => setSelectedIds([]);
 
   const mut = useMutation({
-    mutationFn: async () => gen({ data: { grade, chapterTitle: chapter.title, count } }),
+    mutationFn: async () =>
+      gen({
+        data: {
+          grade,
+          chapterTitles: selectedChapters.map((c) => c.title),
+          count,
+        },
+      }),
     onSuccess: (res) => setItems(res.items),
   });
 
@@ -52,24 +75,69 @@ function WorksheetPage() {
         </label>
         <label className="block">
           <span className="text-muted-foreground text-xs font-bold tracking-[0.18em] uppercase">Grade</span>
-          <select value={grade} onChange={(e) => { setGrade(Number(e.target.value)); setChapterId(1); }}
+          <select value={grade} onChange={(e) => { setGrade(Number(e.target.value)); setSelectedIds([1]); }}
             className="border-border bg-card mt-1 w-full rounded-xl border-2 px-4 py-3 font-semibold outline-none">
             {GRADE_THEMES.map((t) => <option key={t.grade} value={t.grade}>Grade {t.grade} · {t.world}</option>)}
           </select>
         </label>
-        <label className="block">
-          <span className="text-muted-foreground text-xs font-bold tracking-[0.18em] uppercase">Chapter</span>
-          <select value={chapterId} onChange={(e) => setChapterId(Number(e.target.value))}
-            className="border-border bg-card mt-1 w-full rounded-xl border-2 px-4 py-3 font-semibold outline-none">
-            {chapters.map((c) => <option key={c.id} value={c.id}>{c.id}. {c.title}</option>)}
-          </select>
-        </label>
+
+        {/* Chapter multi-select with check/uncheck all */}
+        <div className="block">
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground text-xs font-bold tracking-[0.18em] uppercase">
+              Chapters ({selectedIds.length} selected)
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={selectAll}
+                className="text-primary hover:text-primary/80 inline-flex items-center gap-1 text-xs font-bold"
+              >
+                <CheckSquare className="h-3.5 w-3.5" /> Select all
+              </button>
+              <button
+                type="button"
+                onClick={deselectAll}
+                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs font-bold"
+              >
+                <Square className="h-3.5 w-3.5" /> Deselect all
+              </button>
+            </div>
+          </div>
+          <div className="border-border bg-card mt-2 max-h-56 overflow-y-auto rounded-xl border-2 p-2">
+            {chapters.map((c) => {
+              const checked = selectedIds.includes(c.id);
+              return (
+                <label
+                  key={c.id}
+                  className={`flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                    checked ? "bg-primary/10 text-primary" : "hover:bg-muted"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleChapter(c.id)}
+                    className="h-4 w-4 accent-[var(--primary)]"
+                  />
+                  <span className="flex-1">{c.id}. {c.title}</span>
+                </label>
+              );
+            })}
+          </div>
+          {selectedIds.length === 1 && someSelected && (
+            <p className="text-muted-foreground mt-1 text-xs">
+              Multi-chapter worksheets distribute questions across selected chapters.
+            </p>
+          )}
+        </div>
+
         <label className="block">
           <span className="text-muted-foreground text-xs font-bold tracking-[0.18em] uppercase">Questions: {count}</span>
-          <input type="range" min={5} max={15} value={count} onChange={(e) => setCount(Number(e.target.value))} className="mt-2 w-full" />
+          <input type="range" min={5} max={40} value={count} onChange={(e) => setCount(Number(e.target.value))} className="mt-2 w-full" />
         </label>
 
-        <button onClick={() => mut.mutate()} disabled={mut.isPending}
+        <button onClick={() => mut.mutate()} disabled={mut.isPending || selectedIds.length === 0}
           className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 font-bold disabled:opacity-50">
           <Sparkles className="h-4 w-4" />
           {mut.isPending ? "Generating worksheet…" : "Generate worksheet"}
@@ -80,11 +148,11 @@ function WorksheetPage() {
           <div className="border-border space-y-3 rounded-2xl border-2 p-4">
             <p className="text-sm font-bold">{items.length} questions ready · {items.reduce((s, i) => s + i.marks, 0)} marks total</p>
             <div className="flex flex-wrap gap-2">
-              <button onClick={() => downloadWorksheetPdf({ grade, chapterTitle: chapter.title, items, studentName: name || undefined })}
+              <button onClick={() => downloadWorksheetPdf({ grade, chapterTitles: selectedChapters.map((c) => c.title), items, studentName: name || undefined })}
                 className="bg-foreground text-background inline-flex items-center gap-2 rounded-xl px-4 py-2 font-bold">
                 <FileDown className="h-4 w-4" /> Student copy
               </button>
-              <button onClick={() => downloadWorksheetPdf({ grade, chapterTitle: chapter.title, items, includeAnswers: true, studentName: name || undefined })}
+              <button onClick={() => downloadWorksheetPdf({ grade, chapterTitles: selectedChapters.map((c) => c.title), items, includeAnswers: true, studentName: name || undefined })}
                 className="bg-primary text-primary-foreground inline-flex items-center gap-2 rounded-xl px-4 py-2 font-bold">
                 <FileDown className="h-4 w-4" /> Teacher copy + answers
               </button>
