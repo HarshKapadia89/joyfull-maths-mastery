@@ -305,6 +305,12 @@ function TutorPage() {
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                send(e);
+              }
+            }}
             placeholder={mode === "chat" ? "e.g. Explain LCM with an example" : "e.g. Solve: 3x + 5 = 20"}
             rows={3}
             className="border-border focus:border-primary flex-1 resize-none rounded-2xl border-2 bg-card px-4 py-4 font-semibold outline-none"
