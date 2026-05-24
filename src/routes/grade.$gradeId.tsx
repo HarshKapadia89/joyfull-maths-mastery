@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, notFound, useMatchRoute } from "@tanstack/react-router";
 import { ArrowLeft, Star, Play } from "lucide-react";
 import { getChapters } from "@/data/ncert-maths";
 import { getTheme } from "@/data/grade-themes";
