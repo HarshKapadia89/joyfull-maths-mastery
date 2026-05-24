@@ -34,6 +34,10 @@ export type StoredMistake = {
   timesWrong: number;
   timesRight: number;
   savedAt: number;
+  /** SM-2 lite: consecutive correct count */
+  streak?: number;
+  /** SM-2 lite: epoch ms when this mistake is due for review */
+  nextDueAt?: number;
 };
 
 const initial: ProgressState = {
