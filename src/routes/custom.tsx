@@ -92,23 +92,50 @@ function CustomPage() {
       if (merged.length === 0) throw new Error("Could not generate questions. Try again.");
       return merged;
     },
-    onSuccess: (qs) => setQuestions(qs),
+    onSuccess: (qs) => {
+      setQuestions(qs);
+      if (mode === "timed") {
+        const d = Date.now() + minutes * 60 * 1000;
+        setDeadlineAt(d);
+        setRemaining(minutes * 60);
+      } else {
+        setDeadlineAt(null);
+      }
+    },
   });
+
+  useEffect(() => {
+    if (!deadlineAt) return;
+    const t = setInterval(() => {
+      setRemaining(Math.max(0, Math.round((deadlineAt - Date.now()) / 1000)));
+    }, 500);
+    return () => clearInterval(t);
+  }, [deadlineAt]);
 
   if (questions) {
     const firstChapter = selectedChapters[0];
+    const mm = Math.floor(remaining / 60).toString().padStart(2, "0");
+    const ss = (remaining % 60).toString().padStart(2, "0");
     return (
       <div className="mx-auto max-w-3xl px-4 py-6">
-        <button
-          onClick={() => setQuestions(null)}
-          className="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1 text-sm font-semibold"
-        >
-          <ArrowLeft className="h-4 w-4" /> New custom test
-        </button>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <button
+            onClick={() => { setQuestions(null); setDeadlineAt(null); }}
+            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm font-semibold"
+          >
+            <ArrowLeft className="h-4 w-4" /> New test
+          </button>
+          {deadlineAt && (
+            <div className={`inline-flex items-center gap-2 rounded-xl px-3 py-1.5 font-bold ${remaining < 60 ? "bg-destructive/10 text-destructive" : "bg-secondary"}`}>
+              <Timer className="h-4 w-4" /> {mm}:{ss}
+            </div>
+          )}
+        </div>
         <QuizRunner
           questions={questions}
-          title={`Custom test · ${questions.length} marks`}
+          title={mode === "timed" ? `Timed test · ${questions.length} Q · ${minutes} min` : `Self-paced · ${questions.length} marks`}
           subtitle={`Grade ${grade} · ${selectedChapters.length} chapter${selectedChapters.length > 1 ? "s" : ""}`}
+          deadlineAt={deadlineAt ?? undefined}
           context={
             firstChapter
               ? {
@@ -119,18 +146,12 @@ function CustomPage() {
               : undefined
           }
           onComplete={(score, total) => {
-            // Record results per contributing chapter (proportional to questions used)
             const counts = new Map<number, { title: string; total: number; correct: number }>();
             for (const q of questions) {
-              const entry = counts.get(q._chapterId) ?? {
-                title: q._chapterTitle,
-                total: 0,
-                correct: 0,
-              };
+              const entry = counts.get(q._chapterId) ?? { title: q._chapterTitle, total: 0, correct: 0 };
               entry.total += 1;
               counts.set(q._chapterId, entry);
             }
-            // Distribute score proportionally across chapters
             for (const [cid, info] of counts) {
               const proportionalScore = Math.round((info.total / total) * score);
               recordChapterResult(grade, cid, proportionalScore, info.total);
