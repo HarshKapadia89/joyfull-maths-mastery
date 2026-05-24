@@ -1,9 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation } from "@tanstack/react-query";
-import { useState } from "react";
-import { ArrowLeft, Send, MessageCircle, ListChecks } from "lucide-react";
-import { askTutor, solveStepByStep, type Solution } from "@/lib/quiz.functions";
+import { useRef, useState } from "react";
+import { ArrowLeft, Send, MessageCircle, ListChecks, Camera, X } from "lucide-react";
+import { askTutor, solveStepByStep, solveFromImage, type Solution } from "@/lib/quiz.functions";
 import mascot from "@/assets/mathy-mascot.png";
 
 export const Route = createFileRoute("/tutor")({

@@ -488,3 +488,211 @@ export const solveStepByStep = createServerFn({ method: "POST" })
     });
     return SolutionSchema.parse(parsed);
   });
+
+// ---------- NEW: Twin questions (same concept, fresh numbers) ----------
+export const generateTwins = createServerFn({ method: "POST" })
+  .inputValidator(
+    (data: { grade: number; chapterTitle?: string; basis: { prompt: string; answer: string }; count?: number }) =>
+      z
+        .object({
+          grade: z.number().int().min(1).max(10),
+          chapterTitle: z.string().max(200).optional(),
+          basis: z.object({ prompt: z.string().max(1000), answer: z.string().max(500) }),
+          count: z.number().int().min(1).max(5).optional(),
+        })
+        .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const n = data.count ?? 3;
+    const systemPrompt = `You are an NCERT Grade ${data.grade} Maths teacher${
+      data.chapterTitle ? ` (chapter: "${data.chapterTitle}")` : ""
+    }. Create ${n} TWIN MCQs testing the SAME concept as the original but with different numbers/wording. Each MCQ: exactly 4 options, "answer" matches one option exactly, plain text math, no LaTeX. Slightly vary difficulty. Set "type" to "mcq".`;
+    const userPrompt = `Original question: ${data.basis.prompt}\nOriginal answer: ${data.basis.answer}\nReturn ${n} twin MCQs.`;
+    const parsed = await callAI({
+      systemPrompt,
+      userPrompt,
+      toolName: "return_questions",
+      parameters: questionsToolParams,
+    });
+    const validated = z.object({ questions: z.array(QuestionSchema).min(1) }).parse(parsed);
+    return {
+      questions: validated.questions
+        .filter((q) => q.options && q.options.length === 4 && q.options.includes(q.answer))
+        .map((q) => ({ ...q, type: "mcq" as const })),
+    };
+  });
+
+// ---------- NEW: Worksheet (printable open-ended) ----------
+const WorksheetItemSchema = z.object({
+  question: z.string(),
+  marks: z.number().int().min(1).max(10),
+  solution: z.string(),
+});
+export type WorksheetItem = z.infer<typeof WorksheetItemSchema>;
+
+export const generateWorksheet = createServerFn({ method: "POST" })
+  .inputValidator((data: { grade: number; chapterTitle: string; count?: number }) =>
+    z
+      .object({
+        grade: z.number().int().min(1).max(10),
+        chapterTitle: z.string().min(1).max(200),
+        count: z.number().int().min(4).max(20).optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const count = data.count ?? 10;
+    const systemPrompt = `You are an NCERT Grade ${data.grade} Maths teacher. Create a printable worksheet of ${count} OPEN-ENDED (NOT MCQ) practice questions for "${data.chapterTitle}". Difficulty rises from easy to hard. Each: marks (1-5) and a concise model solution (3-6 lines). Plain text math, no LaTeX, no markdown.`;
+    const userPrompt = `Worksheet for Grade ${data.grade} – ${data.chapterTitle}. ${count} questions.`;
+    const params = {
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          minItems: 3,
+          maxItems: 20,
+          items: {
+            type: "object",
+            properties: {
+              question: { type: "string" },
+              marks: { type: "number" },
+              solution: { type: "string" },
+            },
+            required: ["question", "marks", "solution"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["items"],
+      additionalProperties: false,
+    };
+    const parsed = await callAI({
+      systemPrompt,
+      userPrompt,
+      toolName: "return_worksheet",
+      parameters: params,
+    });
+    const validated = z.object({ items: z.array(WorksheetItemSchema).min(1) }).parse(parsed);
+    return { items: validated.items };
+  });
+
+// ---------- NEW: Solve from image (vision doubt-solver) ----------
+export const solveFromImage = createServerFn({ method: "POST" })
+  .inputValidator((data: { imageDataUrl: string; grade?: number; note?: string }) =>
+    z
+      .object({
+        imageDataUrl: z
+          .string()
+          .min(20)
+          .max(8_000_000)
+          .refine((s) => s.startsWith("data:image/"), "Must be an image data URL"),
+        grade: z.number().int().min(1).max(10).optional(),
+        note: z.string().max(500).optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured");
+    const system = `You are "HBK Mathy", a friendly NCERT Maths tutor${
+      data.grade ? ` (Grade ${data.grade})` : ""
+    }. The student uploaded a photo of a maths problem. Read it carefully, then solve with clear numbered steps using plain text math (no LaTeX, no markdown). End with "Final answer: ...". If the image is unreadable, ask the student to retake the photo.`;
+    const res = await fetch(AI_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: system },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: data.note?.trim() || "Please solve this problem step-by-step." },
+              { type: "image_url", image_url: { url: data.imageDataUrl } },
+            ],
+          },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      if (res.status === 429) throw new Error("Rate limit reached. Please try again in a minute.");
+      if (res.status === 402) throw new Error("AI credits exhausted. Please top up in Settings.");
+      throw new Error(`AI error (${res.status})`);
+    }
+    const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    return { answer: json.choices?.[0]?.message?.content ?? "" };
+  });
+
+// ---------- NEW: Misconception clusters from the mistake bank ----------
+const MisconceptionSchema = z.object({
+  title: z.string(),
+  why: z.string(),
+  fix: z.string(),
+  practiceTip: z.string(),
+});
+export type Misconception = z.infer<typeof MisconceptionSchema>;
+
+export const summarizeMisconceptions = createServerFn({ method: "POST" })
+  .inputValidator(
+    (data: {
+      grade: number;
+      mistakes: { prompt: string; studentAnswer: string; correctAnswer: string; chapterTitle: string }[];
+    }) =>
+      z
+        .object({
+          grade: z.number().int().min(1).max(10),
+          mistakes: z
+            .array(
+              z.object({
+                prompt: z.string().max(800),
+                studentAnswer: z.string().max(300),
+                correctAnswer: z.string().max(300),
+                chapterTitle: z.string().max(200),
+              }),
+            )
+            .min(1)
+            .max(40),
+        })
+        .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const systemPrompt = `You are an NCERT Grade ${data.grade} Maths teacher. Look at this student's recent wrong answers and find 3-6 RECURRING misconceptions or skill gaps. For each: a short title, why students do it (1 sentence), how to fix it (1-2 sentences), one short practice tip. Plain text math only.`;
+    const userPrompt = `Recent mistakes:\n${data.mistakes
+      .slice(0, 30)
+      .map(
+        (m, i) =>
+          `${i + 1}. [${m.chapterTitle}] ${m.prompt}\n   student: ${m.studentAnswer || "(blank)"} | correct: ${m.correctAnswer}`,
+      )
+      .join("\n")}`;
+    const params = {
+      type: "object",
+      properties: {
+        clusters: {
+          type: "array",
+          minItems: 1,
+          maxItems: 8,
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              why: { type: "string" },
+              fix: { type: "string" },
+              practiceTip: { type: "string" },
+            },
+            required: ["title", "why", "fix", "practiceTip"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["clusters"],
+      additionalProperties: false,
+    };
+    const parsed = await callAI({
+      systemPrompt,
+      userPrompt,
+      toolName: "return_clusters",
+      parameters: params,
+    });
+    const validated = z.object({ clusters: z.array(MisconceptionSchema).min(1) }).parse(parsed);
+    return { clusters: validated.clusters };
+  });

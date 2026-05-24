@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation } from "@tanstack/react-query";
-import { Check, X, ArrowRight, Sparkles, Lightbulb } from "lucide-react";
+import { Check, X, ArrowRight, Sparkles, Lightbulb, Plus } from "lucide-react";
 import type { QuizQuestion } from "@/lib/quiz.functions";
-import { explainMistake } from "@/lib/quiz.functions";
+import { explainMistake, generateTwins } from "@/lib/quiz.functions";
 import { addMistake, recordMistakeOutcome } from "@/hooks/useProgress";
+import { recordAnswer } from "@/lib/mastery";
 
 function normalize(s: string) {
   return s.trim().toLowerCase().replace(/\s+/g, " ");
@@ -40,8 +41,9 @@ export function QuizRunner({
     revisionIds?: string[];
   };
 }) {
-  // Strict MCQ-only: drop anything that isn't a clean 4-option MCQ
-  const questions = useMemo(() => rawQuestions.filter(isValidMcq), [rawQuestions]);
+  const baseQuestions = useMemo(() => rawQuestions.filter(isValidMcq), [rawQuestions]);
+  const [extraQs, setExtraQs] = useState<QuizQuestion[]>([]);
+  const questions = useMemo(() => [...baseQuestions, ...extraQs], [baseQuestions, extraQs]);
 
   const [index, setIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -52,6 +54,8 @@ export function QuizRunner({
   const [explanation, setExplanation] = useState<string | null>(null);
 
   const explain = useServerFn(explainMistake);
+  const twins = useServerFn(generateTwins);
+
   const explainMut = useMutation({
     mutationFn: async (vars: { q: QuizQuestion; studentAnswer: string }) => {
       if (!context) throw new Error("No context");
@@ -67,6 +71,24 @@ export function QuizRunner({
     },
     onSuccess: (res) => setExplanation(res.explanation),
     onError: (err) => setExplanation(`⚠️ ${(err as Error).message}`),
+  });
+
+  const twinsMut = useMutation({
+    mutationFn: async (q: QuizQuestion) => {
+      if (!context) throw new Error("No context");
+      return twins({
+        data: {
+          grade: context.grade,
+          chapterTitle: context.chapterTitle,
+          basis: { prompt: q.prompt, answer: q.answer },
+          count: 3,
+        },
+      });
+    },
+    onSuccess: (res) => {
+      const fresh = (res.questions as QuizQuestion[]).filter(isValidMcq);
+      if (fresh.length > 0) setExtraQs((cur) => [...cur, ...fresh]);
+    },
   });
 
   const total = questions.length;
@@ -88,6 +110,7 @@ export function QuizRunner({
     if (isRight) setScore((s) => s + 1);
 
     if (context) {
+      recordAnswer(context.grade, context.chapterId, q.difficulty, isRight);
       if (context.revisionMode && context.revisionIds?.[index]) {
         recordMistakeOutcome(context.revisionIds[index], isRight);
       } else if (!isRight) {
@@ -114,9 +137,9 @@ export function QuizRunner({
     setCorrect(false);
     setExplanation(null);
     explainMut.reset();
+    twinsMut.reset();
   }
 
-  // Keyboard shortcuts: 1-4 / A-D to pick, Enter to advance
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (done || !q) return;
@@ -145,9 +168,7 @@ export function QuizRunner({
     return (
       <div className="bg-card shadow-card mx-auto max-w-2xl rounded-3xl p-8 text-center">
         <p className="font-bold">No MCQs available.</p>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Try regenerating this set.
-        </p>
+        <p className="text-muted-foreground mt-1 text-sm">Try regenerating this set.</p>
       </div>
     );
   }
@@ -260,20 +281,32 @@ export function QuizRunner({
                 HBK Mathy is explaining…
               </div>
             )}
+            {explanation && <p className="mt-2 text-sm whitespace-pre-wrap">{explanation}</p>}
             {explanation && (
-              <p className="mt-2 text-sm whitespace-pre-wrap">{explanation}</p>
-            )}
-            {explanation && (
-              <button
-                onClick={() => {
-                  setExplanation(null);
-                  explainMut.reset();
-                  explainMut.mutate({ q, studentAnswer: input });
-                }}
-                className="text-primary mt-3 text-xs font-bold underline-offset-2 hover:underline"
-              >
-                Explain differently
-              </button>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  onClick={() => {
+                    setExplanation(null);
+                    explainMut.reset();
+                    explainMut.mutate({ q, studentAnswer: input });
+                  }}
+                  className="text-primary text-xs font-bold underline-offset-2 hover:underline"
+                >
+                  Explain differently
+                </button>
+                <button
+                  onClick={() => twinsMut.mutate(q)}
+                  disabled={twinsMut.isPending}
+                  className="bg-primary text-primary-foreground inline-flex items-center gap-1 rounded-lg px-3 py-1 text-xs font-bold disabled:opacity-50"
+                >
+                  <Plus className="h-3 w-3" />
+                  {twinsMut.isPending
+                    ? "Adding…"
+                    : twinsMut.isSuccess
+                      ? "3 twins added"
+                      : "More like this (+3)"}
+                </button>
+              </div>
             )}
           </div>
         )}
