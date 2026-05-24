@@ -98,14 +98,19 @@ const questionsToolParams = {
       items: {
         type: "object",
         properties: {
-          type: { type: "string", enum: ["mcq", "fill_blank", "true_false", "short_answer"] },
+          type: { type: "string", enum: ["mcq"] },
           prompt: { type: "string" },
-          options: { type: "array", items: { type: "string" } },
+          options: {
+            type: "array",
+            items: { type: "string" },
+            minItems: 4,
+            maxItems: 4,
+          },
           answer: { type: "string" },
           explanation: { type: "string" },
           difficulty: { type: "string", enum: ["easy", "medium", "hard"] },
         },
-        required: ["type", "prompt", "answer", "explanation", "difficulty"],
+        required: ["type", "prompt", "options", "answer", "explanation", "difficulty"],
         additionalProperties: false,
       },
     },
@@ -113,6 +118,33 @@ const questionsToolParams = {
   required: ["questions"],
   additionalProperties: false,
 } as const;
+
+function buildMcqSystemPrompt(count: number, grade: number, chapterTitle: string) {
+  return `You are an expert NCERT (India) Mathematics teacher. Generate ${count} original MCQ practice questions for Grade ${grade}, chapter "${chapterTitle}".
+
+Rules:
+- ALL questions must be MCQ (multiple choice) with exactly 4 options.
+- "answer" MUST exactly match one of the 4 option strings.
+- Vary difficulty: mix easy / medium / hard.
+- Strictly within NCERT Grade ${grade} scope for this chapter.
+- "explanation" is a concise 1-sentence solution.
+- Plain text math only (e.g. "3/4", "x^2", "π", "√2"). No LaTeX, no markdown.
+- Each question must be unambiguous and age-appropriate.
+- Set "type" to "mcq" for every question.`;
+}
+
+async function generateMcqBatch(grade: number, chapterTitle: string, count: number) {
+  const parsed = await callAI({
+    systemPrompt: buildMcqSystemPrompt(count, grade, chapterTitle),
+    userPrompt: `Generate ${count} MCQs for Grade ${grade} – ${chapterTitle}.`,
+    toolName: "return_questions",
+    parameters: questionsToolParams,
+  });
+  const validated = z.object({ questions: z.array(QuestionSchema).min(1) }).parse(parsed);
+  return validated.questions
+    .filter((q) => q.options && q.options.length === 4 && q.options.includes(q.answer))
+    .map((q) => ({ ...q, type: "mcq" as const }));
+}
 
 export const generateChapterQuiz = createServerFn({ method: "POST" })
   .inputValidator((data: { grade: number; chapterTitle: string; count?: number }) =>
@@ -126,43 +158,24 @@ export const generateChapterQuiz = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const count = data.count ?? 25;
-    const systemPrompt = `You are an expert NCERT (India) Mathematics teacher creating practice questions for school students. Generate ${count} original, syllabus-aligned questions for Grade ${data.grade}, chapter "${data.chapterTitle}".
-
-Rules:
-- Strictly stay within the chapter's scope and the NCERT Grade ${data.grade} level.
-- Mix all 4 formats: MCQ (4 options), fill_blank, true_false, short_answer (numeric or one-word).
-- Aim for ~10 MCQ, ~6 fill_blank, ~4 true_false, ~5 short_answer. Vary difficulty (easy/medium/hard).
-- For MCQ: exactly 4 options, one correct. "answer" must EXACTLY match one option string.
-- For true_false: options must be ["True","False"], answer one of them.
-- For fill_blank: write the prompt with a "____" blank; the answer is the missing text.
-- For short_answer: keep the answer short (a number or single phrase, max 30 chars).
-- "explanation" is a concise 1-2 sentence solution.
-- Use plain text math (e.g. "3/4", "x^2", "π", "√2"). No LaTeX, no markdown.
-- Questions must be age-appropriate and unambiguous.`;
-
-    const userPrompt = `Generate ${count} questions for Grade ${data.grade} – ${data.chapterTitle}.`;
-
-    const parsed = await callAI({
-      systemPrompt,
-      userPrompt,
-      toolName: "return_questions",
-      parameters: questionsToolParams,
-    });
-
-    const validated = z.object({ questions: z.array(QuestionSchema).min(1) }).parse(parsed);
-    const cleaned = validated.questions.map((q) => {
-      if (q.type === "true_false") return { ...q, options: ["True", "False"] };
-      return q;
-    });
-    return { questions: cleaned };
+    // Parallelize into 2 batches for ~2x speed
+    const half = Math.ceil(count / 2);
+    const rest = count - half;
+    const [a, b] = await Promise.all([
+      generateMcqBatch(data.grade, data.chapterTitle, half),
+      rest > 0 ? generateMcqBatch(data.grade, data.chapterTitle, rest) : Promise.resolve([]),
+    ]);
+    const questions = [...a, ...b].slice(0, count);
+    if (questions.length === 0) throw new Error("Failed to generate questions");
+    return { questions };
   });
 
 export const generateDailyChallenge = createServerFn({ method: "POST" })
   .inputValidator((data: { seed?: string }) => z.object({ seed: z.string().max(64).optional() }).parse(data))
   .handler(async ({ data }) => {
     const seed = data.seed ?? new Date().toISOString().slice(0, 10);
-    const systemPrompt = `You are an NCERT Maths teacher. Generate a "Daily Challenge" of 5 mixed Maths questions spanning grades 5-10 NCERT topics. Mix MCQ, fill_blank, true_false, short_answer. Use plain text math, no LaTeX. Each question needs answer + concise explanation + difficulty.`;
-    const userPrompt = `Daily seed: ${seed}. Generate 5 fresh questions.`;
+    const systemPrompt = `You are an NCERT Maths teacher. Generate a "Daily Challenge" of 5 MCQ questions spanning grades 5-10 NCERT topics. ALL questions must be MCQ with exactly 4 options; "answer" must match one option string exactly. Plain text math, no LaTeX. Each needs concise explanation + difficulty. Set "type" to "mcq".`;
+    const userPrompt = `Daily seed: ${seed}. Generate 5 fresh MCQs.`;
     const parsed = await callAI({
       systemPrompt,
       userPrompt,
@@ -171,9 +184,9 @@ export const generateDailyChallenge = createServerFn({ method: "POST" })
     });
     const validated = z.object({ questions: z.array(QuestionSchema).min(1) }).parse(parsed);
     return {
-      questions: validated.questions.map((q) =>
-        q.type === "true_false" ? { ...q, options: ["True", "False"] } : q,
-      ),
+      questions: validated.questions
+        .filter((q) => q.options && q.options.length === 4 && q.options.includes(q.answer))
+        .map((q) => ({ ...q, type: "mcq" as const })),
     };
   });
 
@@ -249,10 +262,10 @@ export const regenerateVariants = createServerFn({ method: "POST" })
         .parse(data),
   )
   .handler(async ({ data }) => {
-    const systemPrompt = `You are an NCERT Grade ${data.grade} Maths teacher. For each "original" question I give you, produce ONE NEW variant that tests the SAME concept but with different numbers/wording (not a copy). Keep the same type. Follow the same JSON rules as before: MCQ has 4 options with answer matching one; true_false uses options ["True","False"]; plain text math, no LaTeX. One concise explanation each.`;
+    const systemPrompt = `You are an NCERT Grade ${data.grade} Maths teacher. For each "original" question I give you, produce ONE NEW MCQ variant that tests the SAME concept but with different numbers/wording (not a copy). ALL outputs must be MCQ with exactly 4 options; "answer" must match one option exactly. Plain text math, no LaTeX. One concise explanation each. Set "type" to "mcq".`;
     const userPrompt = `Originals:\n${data.basis
-      .map((b, i) => `${i + 1}. [${b.type}] ${b.prompt}  (answer: ${b.answer})`)
-      .join("\n")}\n\nReturn exactly ${data.basis.length} variant questions in the same order.`;
+      .map((b, i) => `${i + 1}. ${b.prompt}  (answer: ${b.answer})`)
+      .join("\n")}\n\nReturn exactly ${data.basis.length} MCQ variants in the same order.`;
     const parsed = await callAI({
       systemPrompt,
       userPrompt,
@@ -261,9 +274,9 @@ export const regenerateVariants = createServerFn({ method: "POST" })
     });
     const validated = z.object({ questions: z.array(QuestionSchema).min(1) }).parse(parsed);
     return {
-      questions: validated.questions.map((q) =>
-        q.type === "true_false" ? { ...q, options: ["True", "False"] } : q,
-      ),
+      questions: validated.questions
+        .filter((q) => q.options && q.options.length === 4 && q.options.includes(q.answer))
+        .map((q) => ({ ...q, type: "mcq" as const })),
     };
   });
 
