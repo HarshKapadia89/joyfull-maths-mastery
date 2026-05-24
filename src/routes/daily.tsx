@@ -22,7 +22,17 @@ function DailyPage() {
   const { recordChapterResult } = useProgress();
 
   const today = new Date().toISOString().slice(0, 10);
-  const cacheKey = `hbk-daily-${today}`;
+  const cacheKey = `hbk-daily-v2-${today}`;
+
+  function filterMcq(qs: QuizQuestion[]): QuizQuestion[] {
+    return qs.filter(
+      (q) =>
+        q.type === "mcq" &&
+        Array.isArray(q.options) &&
+        q.options.length === 4 &&
+        q.options.includes(q.answer),
+    );
+  }
 
   const mutation = useMutation({
     mutationFn: async () => (await generate({ data: { seed: today } })).questions as QuizQuestion[],
