@@ -15,7 +15,11 @@ const QuestionSchema = z.object({
 export type QuizQuestion = z.infer<typeof QuestionSchema>;
 
 const AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const MODEL = "google/gemini-2.5-flash-lite";
+// Accuracy-critical workloads (tutor chat, solver, photo solve, misconception analysis).
+const MODEL_REASONING = "google/gemini-2.5-pro";
+// Bulk structured generation (quizzes, worksheets, variants) — fast + accurate.
+const MODEL_FAST = "google/gemini-2.5-flash";
+const MODEL = MODEL_FAST;
 
 async function callAI(opts: {
   systemPrompt: string;
