@@ -41,9 +41,9 @@ export function ModeCards() {
         </div>
         <div>
           <p className="text-[10px] font-semibold tracking-[0.18em] uppercase opacity-90">
-            Build Your Own
+            Timed or self-paced
           </p>
-          <p className="text-xl font-extrabold">Custom Test</p>
+          <p className="text-xl font-extrabold">Build Your Own Test</p>
         </div>
       </Link>
     </div>

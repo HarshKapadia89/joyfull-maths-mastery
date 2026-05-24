@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
-import { ArrowLeft, Check, Minus, Plus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, Check, Minus, Plus, Timer, Trophy, Zap } from "lucide-react";
 import { GRADE_THEMES } from "@/data/grade-themes";
 import { getChapters } from "@/data/ncert-maths";
 import { generateChapterQuiz, type QuizQuestion } from "@/lib/quiz.functions";
@@ -42,7 +42,11 @@ function CustomPage() {
   const [grade, setGrade] = useState(5);
   const [selectedIds, setSelectedIds] = useState<number[]>([1]);
   const [count, setCount] = useState(20);
+  const [mode, setMode] = useState<"self" | "timed">("self");
+  const [minutes, setMinutes] = useState(30);
   const [questions, setQuestions] = useState<RunnerQ[] | null>(null);
+  const [deadlineAt, setDeadlineAt] = useState<number | null>(null);
+  const [remaining, setRemaining] = useState(0);
 
   const chapters = useMemo(() => getChapters(grade), [grade]);
 
@@ -88,23 +92,50 @@ function CustomPage() {
       if (merged.length === 0) throw new Error("Could not generate questions. Try again.");
       return merged;
     },
-    onSuccess: (qs) => setQuestions(qs),
+    onSuccess: (qs) => {
+      setQuestions(qs);
+      if (mode === "timed") {
+        const d = Date.now() + minutes * 60 * 1000;
+        setDeadlineAt(d);
+        setRemaining(minutes * 60);
+      } else {
+        setDeadlineAt(null);
+      }
+    },
   });
+
+  useEffect(() => {
+    if (!deadlineAt) return;
+    const t = setInterval(() => {
+      setRemaining(Math.max(0, Math.round((deadlineAt - Date.now()) / 1000)));
+    }, 500);
+    return () => clearInterval(t);
+  }, [deadlineAt]);
 
   if (questions) {
     const firstChapter = selectedChapters[0];
+    const mm = Math.floor(remaining / 60).toString().padStart(2, "0");
+    const ss = (remaining % 60).toString().padStart(2, "0");
     return (
       <div className="mx-auto max-w-3xl px-4 py-6">
-        <button
-          onClick={() => setQuestions(null)}
-          className="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1 text-sm font-semibold"
-        >
-          <ArrowLeft className="h-4 w-4" /> New custom test
-        </button>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <button
+            onClick={() => { setQuestions(null); setDeadlineAt(null); }}
+            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm font-semibold"
+          >
+            <ArrowLeft className="h-4 w-4" /> New test
+          </button>
+          {deadlineAt && (
+            <div className={`inline-flex items-center gap-2 rounded-xl px-3 py-1.5 font-bold ${remaining < 60 ? "bg-destructive/10 text-destructive" : "bg-secondary"}`}>
+              <Timer className="h-4 w-4" /> {mm}:{ss}
+            </div>
+          )}
+        </div>
         <QuizRunner
           questions={questions}
-          title={`Custom test · ${questions.length} marks`}
+          title={mode === "timed" ? `Timed test · ${questions.length} Q · ${minutes} min` : `Self-paced · ${questions.length} marks`}
           subtitle={`Grade ${grade} · ${selectedChapters.length} chapter${selectedChapters.length > 1 ? "s" : ""}`}
+          deadlineAt={deadlineAt ?? undefined}
           context={
             firstChapter
               ? {
@@ -115,18 +146,12 @@ function CustomPage() {
               : undefined
           }
           onComplete={(score, total) => {
-            // Record results per contributing chapter (proportional to questions used)
             const counts = new Map<number, { title: string; total: number; correct: number }>();
             for (const q of questions) {
-              const entry = counts.get(q._chapterId) ?? {
-                title: q._chapterTitle,
-                total: 0,
-                correct: 0,
-              };
+              const entry = counts.get(q._chapterId) ?? { title: q._chapterTitle, total: 0, correct: 0 };
               entry.total += 1;
               counts.set(q._chapterId, entry);
             }
-            // Distribute score proportionally across chapters
             for (const [cid, info] of counts) {
               const proportionalScore = Math.round((info.total / total) * score);
               recordChapterResult(grade, cid, proportionalScore, info.total);
@@ -152,13 +177,49 @@ function CustomPage() {
         <p className="text-xs font-semibold tracking-[0.2em] uppercase opacity-90">
           Build Your Own
         </p>
-        <h1 className="text-3xl font-extrabold">Custom Test</h1>
+        <h1 className="text-3xl font-extrabold">Build Your Own Test</h1>
         <p className="mt-1 text-sm opacity-90">
-          Tick the chapters, pick your marks, and get a fresh test.
+          Pick chapters and marks. Choose self-paced or a timed mock.
         </p>
       </div>
 
       <div className="bg-card shadow-card space-y-5 rounded-3xl p-6">
+        {/* MODE */}
+        <div>
+          <span className="text-muted-foreground text-xs font-semibold tracking-[0.18em] uppercase">Mode</span>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setMode("self")}
+              className={`flex items-center gap-2 rounded-xl border-2 px-4 py-3 text-left font-bold transition ${mode === "self" ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-primary"}`}
+            >
+              <Zap className="h-4 w-4" />
+              <span>
+                Self-paced
+                <span className="text-muted-foreground block text-[11px] font-medium">No clock · learn at your speed</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("timed")}
+              className={`flex items-center gap-2 rounded-xl border-2 px-4 py-3 text-left font-bold transition ${mode === "timed" ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-primary"}`}
+            >
+              <Trophy className="h-4 w-4" />
+              <span>
+                Timed mock
+                <span className="text-muted-foreground block text-[11px] font-medium">Countdown · exam practice</span>
+              </span>
+            </button>
+          </div>
+          {mode === "timed" && (
+            <label className="mt-3 block">
+              <span className="text-muted-foreground text-xs font-semibold tracking-[0.18em] uppercase">Time limit: {minutes} min</span>
+              <input type="range" min={5} max={90} step={5} value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} className="mt-2 w-full" />
+            </label>
+          )}
+        </div>
+
+
         {/* GRADE */}
         <label className="block">
           <span className="text-muted-foreground text-xs font-semibold tracking-[0.18em] uppercase">
@@ -305,8 +366,10 @@ function CustomPage() {
           className="bg-primary text-primary-foreground hover:bg-primary/90 w-full rounded-xl px-5 py-3 font-bold disabled:opacity-50"
         >
           {mutation.isPending
-            ? `Generating ${count}-mark test…`
-            : `Start test · ${count} marks`}
+            ? `Generating ${count}-question test…`
+            : mode === "timed"
+              ? `Start timed mock · ${count} Q · ${minutes} min`
+              : `Start self-paced · ${count} marks`}
         </button>
         {mutation.isError && (
           <p className="text-destructive text-sm font-semibold">

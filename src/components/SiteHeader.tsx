@@ -16,10 +16,9 @@ export function SiteHeader() {
             <Home className="inline h-4 w-4 sm:hidden" />
             <span className="hidden sm:inline">Home</span>
           </Link>
-          <Link to="/daily" className="hover:bg-secondary rounded-lg px-2.5 py-1.5 transition">Daily</Link>
-          <Link to="/mock" className="hover:bg-secondary rounded-lg px-2.5 py-1.5 transition">Mock</Link>
+          <Link to="/custom" className="hover:bg-secondary rounded-lg px-2.5 py-1.5 transition">Test</Link>
           <Link to="/tutor" className="hover:bg-secondary rounded-lg px-2.5 py-1.5 transition">Tutor</Link>
-          <Link to="/custom" className="hover:bg-secondary rounded-lg px-2.5 py-1.5 transition">Custom</Link>
+          
           <Link to="/worksheet" className="hover:bg-secondary rounded-lg px-2.5 py-1.5 transition">Worksheet</Link>
           <Link to="/revise" className="hover:bg-secondary rounded-lg px-2.5 py-1.5 transition">Revise</Link>
           <Link to="/misconceptions" className="hover:bg-secondary hidden rounded-lg px-2.5 py-1.5 transition md:inline">Patterns</Link>

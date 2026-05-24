@@ -28,6 +28,7 @@ export function QuizRunner({
   title,
   subtitle,
   context,
+  deadlineAt,
 }: {
   questions: QuizQuestion[];
   onComplete: (score: number, total: number) => void;
@@ -40,6 +41,7 @@ export function QuizRunner({
     revisionMode?: boolean;
     revisionIds?: string[];
   };
+  deadlineAt?: number;
 }) {
   const baseQuestions = useMemo(() => rawQuestions.filter(isValidMcq), [rawQuestions]);
   const [extraQs, setExtraQs] = useState<QuizQuestion[]>([]);
@@ -163,6 +165,22 @@ export function QuizRunner({
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submitted, done, index]);
+
+  // Timed mode: auto-finish at deadline
+  useEffect(() => {
+    if (!deadlineAt || done) return;
+    const remaining = deadlineAt - Date.now();
+    if (remaining <= 0) {
+      setDone(true);
+      onComplete(score, total);
+      return;
+    }
+    const t = setTimeout(() => {
+      setDone(true);
+      onComplete(score, total);
+    }, remaining);
+    return () => clearTimeout(t);
+  }, [deadlineAt, done, score, total, onComplete]);
 
   if (total === 0) {
     return (
