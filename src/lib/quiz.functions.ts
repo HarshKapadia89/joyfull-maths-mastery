@@ -15,19 +15,24 @@ const QuestionSchema = z.object({
 export type QuizQuestion = z.infer<typeof QuestionSchema>;
 
 const AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const MODEL = "google/gemini-2.5-flash-lite";
+// Accuracy-critical workloads (tutor chat, solver, photo solve, misconception analysis).
+const MODEL_REASONING = "google/gemini-2.5-pro";
+// Bulk structured generation (quizzes, worksheets, variants) — fast + accurate.
+const MODEL_FAST = "google/gemini-2.5-flash";
+const MODEL = MODEL_FAST;
 
 async function callAI(opts: {
   systemPrompt: string;
   userPrompt: string;
   toolName: string;
   parameters: Record<string, unknown>;
+  model?: string;
 }) {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured");
 
   const body = {
-    model: MODEL,
+    model: opts.model ?? MODEL,
     messages: [
       { role: "system", content: opts.systemPrompt },
       { role: "user", content: opts.userPrompt },
@@ -67,14 +72,14 @@ async function callAI(opts: {
   return JSON.parse(args);
 }
 
-async function callAIText(systemPrompt: string, userPrompt: string) {
+async function callAIText(systemPrompt: string, userPrompt: string, model?: string) {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured");
   const res = await fetch(AI_URL, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: MODEL,
+      model: model ?? MODEL,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
@@ -220,7 +225,7 @@ export const askTutor = createServerFn({ method: "POST" })
     const systemPrompt = `You are "HBK Mathy", a friendly NCERT Mathematics tutor for school students${
       data.grade ? ` (Grade ${data.grade})` : ""
     }. Explain concepts step-by-step in simple language. Use plain text math (no LaTeX). Keep answers concise but complete. End with one short follow-up tip or question.`;
-    const answer = await callAIText(systemPrompt, data.question);
+    const answer = await callAIText(systemPrompt, data.question, MODEL_REASONING);
     return { answer };
   });
 
@@ -485,6 +490,7 @@ export const solveStepByStep = createServerFn({ method: "POST" })
         required: ["steps", "finalAnswer"],
         additionalProperties: false,
       },
+      model: MODEL_REASONING,
     });
     return SolutionSchema.parse(parsed);
   });
@@ -652,7 +658,7 @@ export const solveFromImage = createServerFn({ method: "POST" })
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: MODEL_REASONING,
         messages: [
           { role: "system", content: system },
           {
@@ -743,6 +749,7 @@ export const summarizeMisconceptions = createServerFn({ method: "POST" })
       userPrompt,
       toolName: "return_clusters",
       parameters: params,
+      model: MODEL_REASONING,
     });
     const validated = z.object({ clusters: z.array(MisconceptionSchema).min(1) }).parse(parsed);
     return { clusters: validated.clusters };
