@@ -15,7 +15,7 @@ import {
 
 export function downloadWorksheetPdf(opts: {
   grade: number;
-  chapterTitle: string;
+  chapterTitles: string[];
   items: WorksheetItem[];
   includeAnswers?: boolean;
   studentName?: string;
@@ -25,7 +25,7 @@ export function downloadWorksheetPdf(opts: {
   const cover = new Set<number>();
   const titleText =
     opts.chapterTitles.length === 1
-      ? opts.chapterTitles[1]
+      ? opts.chapterTitles[0]
       : opts.chapterTitles.length <= 3
         ? opts.chapterTitles.join(" + ")
         : `${opts.chapterTitles[0]} + ${opts.chapterTitles.length - 1} more`;
