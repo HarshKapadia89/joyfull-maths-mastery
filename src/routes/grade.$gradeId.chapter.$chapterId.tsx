@@ -9,6 +9,8 @@ import { useProgress } from "@/hooks/useProgress";
 import { generateChapterQuiz, type QuizQuestion } from "@/lib/quiz.functions";
 import { QuizRunner } from "@/components/quiz/QuizRunner";
 import { ConceptCards } from "@/components/chapter/ConceptCards";
+import { MasteryMeter } from "@/components/chapter/MasteryMeter";
+import { suggestDifficulty } from "@/lib/mastery";
 
 export const Route = createFileRoute("/grade/$gradeId/chapter/$chapterId")({
   beforeLoad: ({ params }) => {
