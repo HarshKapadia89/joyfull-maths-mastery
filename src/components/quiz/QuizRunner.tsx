@@ -28,6 +28,7 @@ export function QuizRunner({
   title,
   subtitle,
   context,
+  deadlineAt,
 }: {
   questions: QuizQuestion[];
   onComplete: (score: number, total: number) => void;
@@ -40,6 +41,7 @@ export function QuizRunner({
     revisionMode?: boolean;
     revisionIds?: string[];
   };
+  deadlineAt?: number;
 }) {
   const baseQuestions = useMemo(() => rawQuestions.filter(isValidMcq), [rawQuestions]);
   const [extraQs, setExtraQs] = useState<QuizQuestion[]>([]);
