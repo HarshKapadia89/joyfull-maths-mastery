@@ -50,7 +50,7 @@ function WorksheetPage() {
         data: {
           grade,
           chapterTitles: selectedChapters.map((c) => c.title),
-          count,
+          totalMarks,
         },
       }),
     onSuccess: (res) => setItems(res.items),
