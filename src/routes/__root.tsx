@@ -108,11 +108,14 @@ function RootShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+import { SiteHeader } from "../components/SiteHeader";
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
     <QueryClientProvider client={queryClient}>
+      <SiteHeader />
       <Outlet />
     </QueryClientProvider>
   );
