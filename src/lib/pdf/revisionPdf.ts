@@ -42,12 +42,10 @@ function drawWatermark(doc: jsPDF) {
   const w = doc.internal.pageSize.getWidth();
   const h = doc.internal.pageSize.getHeight();
 
-  // @ts-expect-error - GState exists on jsPDF runtime
-  const GState = doc.GState;
+  const GState = (doc as unknown as { GState?: new (o: { opacity: number }) => unknown }).GState;
   doc.saveGraphicsState();
   if (GState) {
-    // @ts-expect-error - setGState typed loosely
-    doc.setGState(new GState({ opacity: 0.07 }));
+    (doc as unknown as { setGState: (s: unknown) => void }).setGState(new GState({ opacity: 0.07 }));
   }
   doc.setFont("helvetica", "bold");
   doc.setFontSize(22);
