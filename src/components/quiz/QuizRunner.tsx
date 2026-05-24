@@ -61,6 +61,16 @@ export function QuizRunner({
   const total = questions.length;
   const q = questions[index];
 
+  // Auto-fire AI explanation as soon as a wrong answer is submitted
+  useEffect(() => {
+    if (submitted && !correct && context && !explanation && !explainMut.isPending) {
+      explainMut.mutate({ q, studentAnswer: input });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submitted, correct, index]);
+
+  const q = questions[index];
+
   function check(value: string) {
     if (submitted) return;
     const isRight = normalize(value) === normalize(q.answer);
