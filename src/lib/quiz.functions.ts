@@ -286,36 +286,49 @@ export const generateConceptCards = createServerFn({ method: "POST" })
       .parse(data),
   )
   .handler(async ({ data }) => {
-    const systemPrompt = `You are an NCERT Grade ${data.grade} Maths teacher. Create 4 concise "concept cards" that recap the chapter "${data.chapterTitle}" so a student can revise in 1 minute before practice. Use plain text math, no LaTeX, no markdown. Keep every field to 1-2 short sentences. Age-appropriate for Grade ${data.grade}.`;
-    const userPrompt = `Make 4 concept cards for Grade ${data.grade} – ${data.chapterTitle}.`;
-    const parsed = await callAI({
-      systemPrompt,
-      userPrompt,
-      toolName: "return_cards",
-      parameters: {
-        type: "object",
-        properties: {
-          cards: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                title: { type: "string" },
-                keyIdea: { type: "string" },
-                example: { type: "string" },
-                pitfall: { type: "string" },
-              },
-              required: ["title", "keyIdea", "example", "pitfall"],
-              additionalProperties: false,
+    const systemPrompt = `You are an NCERT Grade ${data.grade} Maths teacher. Create exactly 4 concise "concept cards" that recap the chapter "${data.chapterTitle}" so a student can revise in 1 minute before practice. Use plain text math, no LaTeX, no markdown. Keep every field to 1-2 short sentences. Age-appropriate for Grade ${data.grade}. You MUST return 4 cards in the "cards" array.`;
+    const userPrompt = `Make 4 concept cards for Grade ${data.grade} – ${data.chapterTitle}. Return all 4 entries inside the "cards" array.`;
+    const schema = z.object({ cards: z.array(ConceptCardSchema).min(1).max(8) });
+    const params = {
+      type: "object",
+      properties: {
+        cards: {
+          type: "array",
+          minItems: 3,
+          maxItems: 6,
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              keyIdea: { type: "string" },
+              example: { type: "string" },
+              pitfall: { type: "string" },
             },
+            required: ["title", "keyIdea", "example", "pitfall"],
+            additionalProperties: false,
           },
         },
-        required: ["cards"],
-        additionalProperties: false,
       },
-    });
-    const validated = z.object({ cards: z.array(ConceptCardSchema).min(1).max(8) }).parse(parsed);
-    return { cards: validated.cards };
+      required: ["cards"],
+      additionalProperties: false,
+    };
+
+    let lastErr: unknown;
+    for (let i = 0; i < 2; i++) {
+      try {
+        const parsed = await callAI({
+          systemPrompt,
+          userPrompt,
+          toolName: "return_cards",
+          parameters: params,
+        });
+        const validated = schema.parse(parsed);
+        return { cards: validated.cards };
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    throw lastErr instanceof Error ? lastErr : new Error("Failed to generate concept cards");
   });
 
 // ---------- NEW: Step-by-step solver ----------
