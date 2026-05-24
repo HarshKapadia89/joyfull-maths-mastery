@@ -177,13 +177,49 @@ function CustomPage() {
         <p className="text-xs font-semibold tracking-[0.2em] uppercase opacity-90">
           Build Your Own
         </p>
-        <h1 className="text-3xl font-extrabold">Custom Test</h1>
+        <h1 className="text-3xl font-extrabold">Build Your Own Test</h1>
         <p className="mt-1 text-sm opacity-90">
-          Tick the chapters, pick your marks, and get a fresh test.
+          Pick chapters and marks. Choose self-paced or a timed mock.
         </p>
       </div>
 
       <div className="bg-card shadow-card space-y-5 rounded-3xl p-6">
+        {/* MODE */}
+        <div>
+          <span className="text-muted-foreground text-xs font-semibold tracking-[0.18em] uppercase">Mode</span>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setMode("self")}
+              className={`flex items-center gap-2 rounded-xl border-2 px-4 py-3 text-left font-bold transition ${mode === "self" ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-primary"}`}
+            >
+              <Zap className="h-4 w-4" />
+              <span>
+                Self-paced
+                <span className="text-muted-foreground block text-[11px] font-medium">No clock · learn at your speed</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("timed")}
+              className={`flex items-center gap-2 rounded-xl border-2 px-4 py-3 text-left font-bold transition ${mode === "timed" ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-primary"}`}
+            >
+              <Trophy className="h-4 w-4" />
+              <span>
+                Timed mock
+                <span className="text-muted-foreground block text-[11px] font-medium">Countdown · exam practice</span>
+              </span>
+            </button>
+          </div>
+          {mode === "timed" && (
+            <label className="mt-3 block">
+              <span className="text-muted-foreground text-xs font-semibold tracking-[0.18em] uppercase">Time limit: {minutes} min</span>
+              <input type="range" min={5} max={90} step={5} value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} className="mt-2 w-full" />
+            </label>
+          )}
+        </div>
+
+
         {/* GRADE */}
         <label className="block">
           <span className="text-muted-foreground text-xs font-semibold tracking-[0.18em] uppercase">
