@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
-import { ArrowLeft, Check, Minus, Plus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, Check, Minus, Plus, Timer, Trophy, Zap } from "lucide-react";
 import { GRADE_THEMES } from "@/data/grade-themes";
 import { getChapters } from "@/data/ncert-maths";
 import { generateChapterQuiz, type QuizQuestion } from "@/lib/quiz.functions";
