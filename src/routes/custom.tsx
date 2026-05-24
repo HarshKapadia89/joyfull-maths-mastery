@@ -366,8 +366,10 @@ function CustomPage() {
           className="bg-primary text-primary-foreground hover:bg-primary/90 w-full rounded-xl px-5 py-3 font-bold disabled:opacity-50"
         >
           {mutation.isPending
-            ? `Generating ${count}-mark test…`
-            : `Start test · ${count} marks`}
+            ? `Generating ${count}-question test…`
+            : mode === "timed"
+              ? `Start timed mock · ${count} Q · ${minutes} min`
+              : `Start self-paced · ${count} marks`}
         </button>
         {mutation.isError && (
           <p className="text-destructive text-sm font-semibold">
