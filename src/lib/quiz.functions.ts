@@ -749,6 +749,7 @@ export const summarizeMisconceptions = createServerFn({ method: "POST" })
       userPrompt,
       toolName: "return_clusters",
       parameters: params,
+      model: MODEL_REASONING,
     });
     const validated = z.object({ clusters: z.array(MisconceptionSchema).min(1) }).parse(parsed);
     return { clusters: validated.clusters };
