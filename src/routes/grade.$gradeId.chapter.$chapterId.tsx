@@ -1,6 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import { getChapter } from "@/data/ncert-maths";
 import { getTheme } from "@/data/grade-themes";
@@ -29,7 +30,16 @@ export const Route = createFileRoute("/grade/$gradeId/chapter/$chapterId")({
   component: ChapterQuiz,
 });
 
-const CACHE_PREFIX = "hbk-quiz-cache-v1:";
+const CACHE_PREFIX = "hbk-quiz-cache-v2:";
+
+function isValidMcq(q: QuizQuestion) {
+  return (
+    q.type === "mcq" &&
+    Array.isArray(q.options) &&
+    q.options.length === 4 &&
+    q.options.includes(q.answer)
+  );
+}
 
 function readCache(key: string): QuizQuestion[] | undefined {
   if (typeof window === "undefined") return undefined;
@@ -37,7 +47,9 @@ function readCache(key: string): QuizQuestion[] | undefined {
     const raw = localStorage.getItem(key);
     if (!raw) return undefined;
     const parsed = JSON.parse(raw) as QuizQuestion[];
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : undefined;
+    if (!Array.isArray(parsed)) return undefined;
+    const clean = parsed.filter(isValidMcq);
+    return clean.length > 0 ? clean : undefined;
   } catch {
     return undefined;
   }
@@ -52,6 +64,8 @@ function ChapterQuiz() {
   const { recordChapterResult } = useProgress();
   const generate = useServerFn(generateChapterQuiz);
   const queryClient = useQueryClient();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const cacheKey = `${CACHE_PREFIX}${grade}-${cId}`;
   const queryKey = ["chapter-quiz", grade, cId] as const;
@@ -86,7 +100,7 @@ function ChapterQuiz() {
         >
           <ArrowLeft className="h-4 w-4" /> Back to {theme.world}
         </Link>
-        {data && (
+        {mounted && data && (
           <button
             onClick={regenerate}
             disabled={isFetching}

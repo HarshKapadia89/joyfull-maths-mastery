@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation } from "@tanstack/react-query";
 import { Check, X, ArrowRight, Sparkles, Lightbulb } from "lucide-react";
@@ -10,8 +10,19 @@ function normalize(s: string) {
   return s.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+const LETTERS = ["A", "B", "C", "D"] as const;
+
+function isValidMcq(q: QuizQuestion) {
+  return (
+    q.type === "mcq" &&
+    Array.isArray(q.options) &&
+    q.options.length === 4 &&
+    q.options.some((o) => normalize(o) === normalize(q.answer))
+  );
+}
+
 export function QuizRunner({
-  questions,
+  questions: rawQuestions,
   onComplete,
   title,
   subtitle,
@@ -21,17 +32,17 @@ export function QuizRunner({
   onComplete: (score: number, total: number) => void;
   title: string;
   subtitle?: string;
-  /** Optional: enables mistake bank + revision tracking */
   context?: {
     grade: number;
     chapterId: number;
     chapterTitle: string;
-    /** If true, treat each question as a revision attempt (update mistake outcomes) */
     revisionMode?: boolean;
-    /** Map quiz-question index -> mistake id (revisionMode only) */
     revisionIds?: string[];
   };
 }) {
+  // Strict MCQ-only: drop anything that isn't a clean 4-option MCQ
+  const questions = useMemo(() => rawQuestions.filter(isValidMcq), [rawQuestions]);
+
   const [index, setIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [submitted, setSubmitted] = useState(false);
@@ -61,7 +72,6 @@ export function QuizRunner({
   const total = questions.length;
   const q = questions[index];
 
-  // Auto-fire AI explanation as soon as a wrong answer is submitted
   useEffect(() => {
     if (submitted && !correct && context && !explanation && !explainMut.isPending) {
       explainMut.mutate({ q, studentAnswer: input });
@@ -69,11 +79,10 @@ export function QuizRunner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submitted, correct, index]);
 
-
-
   function check(value: string) {
-    if (submitted) return;
+    if (submitted || !q) return;
     const isRight = normalize(value) === normalize(q.answer);
+    setInput(value);
     setCorrect(isRight);
     setSubmitted(true);
     if (isRight) setScore((s) => s + 1);
@@ -107,6 +116,42 @@ export function QuizRunner({
     explainMut.reset();
   }
 
+  // Keyboard shortcuts: 1-4 / A-D to pick, Enter to advance
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (done || !q) return;
+      if (submitted && (e.key === "Enter" || e.key === " ")) {
+        e.preventDefault();
+        next();
+        return;
+      }
+      if (submitted) return;
+      const opts = q.options ?? [];
+      const k = e.key.toUpperCase();
+      let idx = -1;
+      if (k >= "1" && k <= "4") idx = parseInt(k, 10) - 1;
+      else if (k >= "A" && k <= "D") idx = k.charCodeAt(0) - 65;
+      if (idx >= 0 && idx < opts.length) {
+        e.preventDefault();
+        check(opts[idx]);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submitted, done, index]);
+
+  if (total === 0) {
+    return (
+      <div className="bg-card shadow-card mx-auto max-w-2xl rounded-3xl p-8 text-center">
+        <p className="font-bold">No MCQs available.</p>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Try regenerating this set.
+        </p>
+      </div>
+    );
+  }
+
   if (done) {
     const pct = Math.round((score / total) * 100);
     return (
@@ -126,6 +171,7 @@ export function QuizRunner({
   }
 
   const progressPct = ((index + (submitted ? 1 : 0)) / total) * 100;
+  const options = q.options ?? [];
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -144,63 +190,47 @@ export function QuizRunner({
 
       <div className="bg-card shadow-card rounded-3xl p-6">
         <p className="text-muted-foreground text-[10px] font-semibold tracking-[0.18em] uppercase">
-          {q.type.replace("_", " ")} · {q.difficulty}
+          MCQ · {q.difficulty} · tap an option or press {LETTERS.join("/")}
         </p>
         <p className="mt-1 text-lg font-semibold whitespace-pre-wrap">{q.prompt}</p>
 
-        <div className="mt-5 space-y-2">
-          {(q.type === "mcq" || q.type === "true_false") && q.options ? (
-            q.options.map((opt) => {
-              const isPicked = submitted && normalize(opt) === normalize(input);
-              const isAnswer = submitted && normalize(opt) === normalize(q.answer);
-              return (
-                <button
-                  key={opt}
-                  onClick={() => {
-                    setInput(opt);
-                    check(opt);
-                  }}
-                  disabled={submitted}
-                  className={`w-full rounded-xl border-2 px-4 py-3 text-left font-semibold transition ${
-                    isAnswer
-                      ? "border-success bg-success/10 text-success"
-                      : isPicked
-                        ? "border-destructive bg-destructive/10 text-destructive"
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          {options.map((opt, i) => {
+            const isPicked = submitted && normalize(opt) === normalize(input);
+            const isAnswer = submitted && normalize(opt) === normalize(q.answer);
+            const dim = submitted && !isPicked && !isAnswer;
+            return (
+              <button
+                key={opt + i}
+                onClick={() => check(opt)}
+                disabled={submitted}
+                className={`group flex min-h-[64px] items-start gap-3 rounded-2xl border-2 px-4 py-3 text-left font-semibold transition ${
+                  isAnswer
+                    ? "border-success bg-success/10 text-success"
+                    : isPicked
+                      ? "border-destructive bg-destructive/10 text-destructive"
+                      : dim
+                        ? "border-border bg-secondary/40 opacity-60"
                         : "border-border hover:border-primary hover:bg-primary/5"
+                }`}
+              >
+                <span
+                  className={`flex h-8 w-8 flex-none items-center justify-center rounded-xl text-sm font-extrabold transition ${
+                    isAnswer
+                      ? "bg-success text-success-foreground"
+                      : isPicked
+                        ? "bg-destructive text-destructive-foreground"
+                        : "bg-secondary text-foreground group-hover:bg-primary group-hover:text-primary-foreground"
                   }`}
                 >
-                  {opt}
-                  {isAnswer && <Check className="ml-2 inline h-4 w-4" />}
-                  {isPicked && !isAnswer && <X className="ml-2 inline h-4 w-4" />}
-                </button>
-              );
-            })
-          ) : (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!submitted && input.trim()) check(input);
-              }}
-              className="flex gap-2"
-            >
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                disabled={submitted}
-                placeholder="Type your answer…"
-                className="border-border focus:border-primary focus:ring-primary/30 flex-1 rounded-xl border-2 px-4 py-3 font-semibold outline-none focus:ring-2"
-                autoFocus
-              />
-              {!submitted && (
-                <button
-                  type="submit"
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl px-5 py-3 font-bold"
-                >
-                  Check
-                </button>
-              )}
-            </form>
-          )}
+                  {LETTERS[i]}
+                </span>
+                <span className="flex-1 self-center text-base leading-snug">{opt}</span>
+                {isAnswer && <Check className="mt-1 h-5 w-5 flex-none" />}
+                {isPicked && !isAnswer && <X className="mt-1 h-5 w-5 flex-none" />}
+              </button>
+            );
+          })}
         </div>
 
         {submitted && (
@@ -247,7 +277,6 @@ export function QuizRunner({
             )}
           </div>
         )}
-
 
         {submitted && (
           <button

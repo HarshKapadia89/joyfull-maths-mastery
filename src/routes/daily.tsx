@@ -22,7 +22,17 @@ function DailyPage() {
   const { recordChapterResult } = useProgress();
 
   const today = new Date().toISOString().slice(0, 10);
-  const cacheKey = `hbk-daily-${today}`;
+  const cacheKey = `hbk-daily-v2-${today}`;
+
+  function filterMcq(qs: QuizQuestion[]): QuizQuestion[] {
+    return qs.filter(
+      (q) =>
+        q.type === "mcq" &&
+        Array.isArray(q.options) &&
+        q.options.length === 4 &&
+        q.options.includes(q.answer),
+    );
+  }
 
   const mutation = useMutation({
     mutationFn: async () => (await generate({ data: { seed: today } })).questions as QuizQuestion[],
@@ -47,7 +57,8 @@ function DailyPage() {
   }, [cacheKey]);
 
   const cached = typeof window !== "undefined" ? localStorage.getItem(cacheKey) : null;
-  const questions = mutation.data ?? (cached ? (JSON.parse(cached) as QuizQuestion[]) : undefined);
+  const rawQuestions = mutation.data ?? (cached ? (JSON.parse(cached) as QuizQuestion[]) : undefined);
+  const questions = rawQuestions ? filterMcq(rawQuestions) : undefined;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">
