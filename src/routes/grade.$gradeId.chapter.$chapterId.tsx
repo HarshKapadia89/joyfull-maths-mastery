@@ -75,7 +75,8 @@ function ChapterQuiz() {
   const { data, isPending, isError, error, refetch, isFetching } = useQuery({
     queryKey,
     queryFn: async () => {
-      const res = await generate({ data: { grade, chapterTitle: chapter.title, count: 25 } });
+      const difficulty = suggestDifficulty(grade, cId);
+      const res = await generate({ data: { grade, chapterTitle: chapter.title, count: 25, difficulty } });
       const qs = res.questions as QuizQuestion[];
       try { localStorage.setItem(cacheKey, JSON.stringify(qs)); } catch { /* ignore */ }
       return qs;
@@ -136,6 +137,7 @@ function ChapterQuiz() {
 
       {data && data.length > 0 && (
         <>
+          <MasteryMeter grade={grade} chapterId={cId} />
           <ConceptCards grade={grade} chapterId={cId} chapterTitle={chapter.title} />
           <QuizRunner
             key={cacheKey}
