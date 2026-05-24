@@ -26,12 +26,13 @@ async function callAI(opts: {
   userPrompt: string;
   toolName: string;
   parameters: Record<string, unknown>;
+  model?: string;
 }) {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured");
 
   const body = {
-    model: MODEL,
+    model: opts.model ?? MODEL,
     messages: [
       { role: "system", content: opts.systemPrompt },
       { role: "user", content: opts.userPrompt },
