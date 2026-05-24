@@ -531,96 +531,100 @@ const WorksheetItemSchema = z.object({
 export type WorksheetItem = z.infer<typeof WorksheetItemSchema>;
 
 export const generateWorksheet = createServerFn({ method: "POST" })
-  .inputValidator((data: { grade: number; chapterTitles: string[]; count?: number }) =>
+  .inputValidator((data: { grade: number; chapterTitles: string[]; totalMarks?: number }) =>
     z
       .object({
         grade: z.number().int().min(1).max(10),
         chapterTitles: z.array(z.string().min(1).max(200)).min(1).max(15),
-        count: z.number().int().min(4).max(40).optional(),
+        totalMarks: z.number().int().min(5).max(100).optional(),
       })
       .parse(data),
   )
   .handler(async ({ data }) => {
-    const count = data.count ?? 10;
+    const totalMarks = data.totalMarks ?? 30;
+    // Aim for ~3 marks/question on average; bound to a sane range.
+    const targetQuestions = Math.max(4, Math.min(40, Math.round(totalMarks / 3)));
 
-    // Single chapter — existing path
-    if (data.chapterTitles.length === 1) {
-      const systemPrompt = `You are an NCERT Grade ${data.grade} Maths teacher. Create a printable worksheet of ${count} OPEN-ENDED (NOT MCQ) practice questions for "${data.chapterTitles[0]}". Difficulty rises from easy to hard. Each: marks (1-5) and a concise model solution (3-6 lines). Plain text math, no LaTeX, no markdown.`;
-    const userPrompt = `Worksheet for Grade ${data.grade} – ${data.chapterTitles[0]}. ${count} questions.`;
-      const params = {
-        type: "object",
-        properties: {
+    const worksheetParams = {
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          minItems: 3,
+          maxItems: 40,
           items: {
-            type: "array",
-            minItems: 3,
-            maxItems: 40,
-            items: {
-              type: "object",
-              properties: {
-                question: { type: "string" },
-                marks: { type: "number" },
-                solution: { type: "string" },
-              },
-              required: ["question", "marks", "solution"],
-              additionalProperties: false,
+            type: "object",
+            properties: {
+              question: { type: "string" },
+              marks: { type: "number" },
+              solution: { type: "string" },
             },
+            required: ["question", "marks", "solution"],
+            additionalProperties: false,
           },
         },
-        required: ["items"],
-        additionalProperties: false,
-      };
+      },
+      required: ["items"],
+      additionalProperties: false,
+    };
+
+    async function generateForChapter(chapterTitle: string, qCount: number, marksBudget: number) {
+      const systemPrompt = `You are an NCERT Grade ${data.grade} Maths teacher. Create a printable worksheet of approximately ${qCount} OPEN-ENDED (NOT MCQ) practice questions for "${chapterTitle}". Difficulty rises from easy to hard. Each question carries marks between 1 and 5. The marks of all questions MUST sum to exactly ${marksBudget}. Include a concise model solution (3-6 lines). Plain text math, no LaTeX, no markdown.`;
+      const userPrompt = `Worksheet for Grade ${data.grade} – ${chapterTitle}. About ${qCount} questions totalling exactly ${marksBudget} marks.`;
       const parsed = await callAI({
         systemPrompt,
         userPrompt,
         toolName: "return_worksheet",
-        parameters: params,
+        parameters: worksheetParams,
       });
       const validated = z.object({ items: z.array(WorksheetItemSchema).min(1) }).parse(parsed);
-      return { items: validated.items };
+      return validated.items;
     }
 
-    // Multiple chapters — distribute count and call in parallel
-    const perChapter = Math.max(3, Math.floor(count / data.chapterTitles.length));
+    // Distribute marks across chapters (last chapter absorbs the remainder).
+    const n = data.chapterTitles.length;
+    const perMarks = Math.floor(totalMarks / n);
+    const perQuestions = Math.max(2, Math.round(targetQuestions / n));
     const batches = await Promise.all(
-      data.chapterTitles.map(async (chapterTitle) => {
-        const systemPrompt = `You are an NCERT Grade ${data.grade} Maths teacher. Create a printable worksheet of ${perChapter} OPEN-ENDED (NOT MCQ) practice questions for "${chapterTitle}". Difficulty rises from easy to hard. Each: marks (1-5) and a concise model solution (3-6 lines). Plain text math, no LaTeX, no markdown.`;
-        const userPrompt = `Worksheet for Grade ${data.grade} – ${chapterTitle}. ${perChapter} questions.`;
-        const params = {
-          type: "object",
-          properties: {
-            items: {
-              type: "array",
-              minItems: 1,
-              maxItems: 40,
-              items: {
-                type: "object",
-                properties: {
-                  question: { type: "string" },
-                  marks: { type: "number" },
-                  solution: { type: "string" },
-                },
-                required: ["question", "marks", "solution"],
-                additionalProperties: false,
-              },
-            },
-          },
-          required: ["items"],
-          additionalProperties: false,
-        };
-        const parsed = await callAI({
-          systemPrompt,
-          userPrompt,
-          toolName: "return_worksheet",
-          parameters: params,
-        });
-        const validated = z.object({ items: z.array(WorksheetItemSchema).min(1) }).parse(parsed);
-        return validated.items;
+      data.chapterTitles.map((title, i) => {
+        const m = i === n - 1 ? totalMarks - perMarks * (n - 1) : perMarks;
+        return generateForChapter(title, perQuestions, m);
       }),
     );
 
-    const allItems = batches.flat().slice(0, count);
-    if (allItems.length === 0) throw new Error("Failed to generate worksheet items");
-    return { items: allItems };
+    // Enforce the exact total: greedily accumulate, then patch the last item if needed.
+    const pool = batches.flat();
+    const out: typeof pool = [];
+    let sum = 0;
+    for (const it of pool) {
+      const m = Math.max(1, Math.min(5, Math.round(it.marks)));
+      if (sum + m > totalMarks) continue;
+      out.push({ ...it, marks: m });
+      sum += m;
+      if (sum >= totalMarks) break;
+    }
+    if (out.length === 0) throw new Error("Failed to generate worksheet items");
+
+    if (sum < totalMarks) {
+      // Top up by adding remaining unused items where they fit.
+      const used = new Set(out);
+      for (const it of pool) {
+        if (sum >= totalMarks) break;
+        if (used.has(it)) continue;
+        const remaining = totalMarks - sum;
+        const m = Math.max(1, Math.min(remaining, Math.min(5, Math.round(it.marks))));
+        out.push({ ...it, marks: m });
+        sum += m;
+      }
+    }
+    if (sum !== totalMarks) {
+      // Final patch — adjust the last item's marks (1–10) to close any remaining gap.
+      const last = out[out.length - 1];
+      const newMarks = Math.max(1, Math.min(10, last.marks + (totalMarks - sum)));
+      out[out.length - 1] = { ...last, marks: newMarks };
+    }
+
+    return { items: out };
   });
 
 // ---------- NEW: Solve from image (vision doubt-solver) ----------
