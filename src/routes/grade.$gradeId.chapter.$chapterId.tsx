@@ -30,7 +30,16 @@ export const Route = createFileRoute("/grade/$gradeId/chapter/$chapterId")({
   component: ChapterQuiz,
 });
 
-const CACHE_PREFIX = "hbk-quiz-cache-v1:";
+const CACHE_PREFIX = "hbk-quiz-cache-v2:";
+
+function isValidMcq(q: QuizQuestion) {
+  return (
+    q.type === "mcq" &&
+    Array.isArray(q.options) &&
+    q.options.length === 4 &&
+    q.options.includes(q.answer)
+  );
+}
 
 function readCache(key: string): QuizQuestion[] | undefined {
   if (typeof window === "undefined") return undefined;
@@ -38,7 +47,9 @@ function readCache(key: string): QuizQuestion[] | undefined {
     const raw = localStorage.getItem(key);
     if (!raw) return undefined;
     const parsed = JSON.parse(raw) as QuizQuestion[];
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : undefined;
+    if (!Array.isArray(parsed)) return undefined;
+    const clean = parsed.filter(isValidMcq);
+    return clean.length > 0 ? clean : undefined;
   } catch {
     return undefined;
   }
