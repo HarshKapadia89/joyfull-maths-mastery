@@ -57,7 +57,8 @@ function DailyPage() {
   }, [cacheKey]);
 
   const cached = typeof window !== "undefined" ? localStorage.getItem(cacheKey) : null;
-  const questions = mutation.data ?? (cached ? (JSON.parse(cached) as QuizQuestion[]) : undefined);
+  const rawQuestions = mutation.data ?? (cached ? (JSON.parse(cached) as QuizQuestion[]) : undefined);
+  const questions = rawQuestions ? filterMcq(rawQuestions) : undefined;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">
