@@ -9,38 +9,148 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TutorRouteImport } from './routes/tutor'
+import { Route as ProgressRouteImport } from './routes/progress'
+import { Route as DailyRouteImport } from './routes/daily'
+import { Route as CustomRouteImport } from './routes/custom'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as GradeGradeIdRouteImport } from './routes/grade.$gradeId'
+import { Route as GradeGradeIdChapterChapterIdRouteImport } from './routes/grade.$gradeId.chapter.$chapterId'
 
+const TutorRoute = TutorRouteImport.update({
+  id: '/tutor',
+  path: '/tutor',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProgressRoute = ProgressRouteImport.update({
+  id: '/progress',
+  path: '/progress',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DailyRoute = DailyRouteImport.update({
+  id: '/daily',
+  path: '/daily',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CustomRoute = CustomRouteImport.update({
+  id: '/custom',
+  path: '/custom',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GradeGradeIdRoute = GradeGradeIdRouteImport.update({
+  id: '/grade/$gradeId',
+  path: '/grade/$gradeId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GradeGradeIdChapterChapterIdRoute =
+  GradeGradeIdChapterChapterIdRouteImport.update({
+    id: '/chapter/$chapterId',
+    path: '/chapter/$chapterId',
+    getParentRoute: () => GradeGradeIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/custom': typeof CustomRoute
+  '/daily': typeof DailyRoute
+  '/progress': typeof ProgressRoute
+  '/tutor': typeof TutorRoute
+  '/grade/$gradeId': typeof GradeGradeIdRouteWithChildren
+  '/grade/$gradeId/chapter/$chapterId': typeof GradeGradeIdChapterChapterIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/custom': typeof CustomRoute
+  '/daily': typeof DailyRoute
+  '/progress': typeof ProgressRoute
+  '/tutor': typeof TutorRoute
+  '/grade/$gradeId': typeof GradeGradeIdRouteWithChildren
+  '/grade/$gradeId/chapter/$chapterId': typeof GradeGradeIdChapterChapterIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/custom': typeof CustomRoute
+  '/daily': typeof DailyRoute
+  '/progress': typeof ProgressRoute
+  '/tutor': typeof TutorRoute
+  '/grade/$gradeId': typeof GradeGradeIdRouteWithChildren
+  '/grade/$gradeId/chapter/$chapterId': typeof GradeGradeIdChapterChapterIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/custom'
+    | '/daily'
+    | '/progress'
+    | '/tutor'
+    | '/grade/$gradeId'
+    | '/grade/$gradeId/chapter/$chapterId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/custom'
+    | '/daily'
+    | '/progress'
+    | '/tutor'
+    | '/grade/$gradeId'
+    | '/grade/$gradeId/chapter/$chapterId'
+  id:
+    | '__root__'
+    | '/'
+    | '/custom'
+    | '/daily'
+    | '/progress'
+    | '/tutor'
+    | '/grade/$gradeId'
+    | '/grade/$gradeId/chapter/$chapterId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CustomRoute: typeof CustomRoute
+  DailyRoute: typeof DailyRoute
+  ProgressRoute: typeof ProgressRoute
+  TutorRoute: typeof TutorRoute
+  GradeGradeIdRoute: typeof GradeGradeIdRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/tutor': {
+      id: '/tutor'
+      path: '/tutor'
+      fullPath: '/tutor'
+      preLoaderRoute: typeof TutorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/progress': {
+      id: '/progress'
+      path: '/progress'
+      fullPath: '/progress'
+      preLoaderRoute: typeof ProgressRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/daily': {
+      id: '/daily'
+      path: '/daily'
+      fullPath: '/daily'
+      preLoaderRoute: typeof DailyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/custom': {
+      id: '/custom'
+      path: '/custom'
+      fullPath: '/custom'
+      preLoaderRoute: typeof CustomRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,12 +158,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/grade/$gradeId': {
+      id: '/grade/$gradeId'
+      path: '/grade/$gradeId'
+      fullPath: '/grade/$gradeId'
+      preLoaderRoute: typeof GradeGradeIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/grade/$gradeId/chapter/$chapterId': {
+      id: '/grade/$gradeId/chapter/$chapterId'
+      path: '/chapter/$chapterId'
+      fullPath: '/grade/$gradeId/chapter/$chapterId'
+      preLoaderRoute: typeof GradeGradeIdChapterChapterIdRouteImport
+      parentRoute: typeof GradeGradeIdRoute
+    }
   }
 }
 
+interface GradeGradeIdRouteChildren {
+  GradeGradeIdChapterChapterIdRoute: typeof GradeGradeIdChapterChapterIdRoute
+}
+
+const GradeGradeIdRouteChildren: GradeGradeIdRouteChildren = {
+  GradeGradeIdChapterChapterIdRoute: GradeGradeIdChapterChapterIdRoute,
+}
+
+const GradeGradeIdRouteWithChildren = GradeGradeIdRoute._addFileChildren(
+  GradeGradeIdRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CustomRoute: CustomRoute,
+  DailyRoute: DailyRoute,
+  ProgressRoute: ProgressRoute,
+  TutorRoute: TutorRoute,
+  GradeGradeIdRoute: GradeGradeIdRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
