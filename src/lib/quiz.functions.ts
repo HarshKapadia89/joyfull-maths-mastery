@@ -490,6 +490,7 @@ export const solveStepByStep = createServerFn({ method: "POST" })
         required: ["steps", "finalAnswer"],
         additionalProperties: false,
       },
+      model: MODEL_REASONING,
     });
     return SolutionSchema.parse(parsed);
   });
