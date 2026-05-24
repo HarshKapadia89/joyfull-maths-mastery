@@ -69,7 +69,7 @@ export function QuizRunner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submitted, correct, index]);
 
-  const q = questions[index];
+
 
   function check(value: string) {
     if (submitted) return;
