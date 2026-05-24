@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation } from "@tanstack/react-query";
-import { useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowLeft, Check, Minus, Plus } from "lucide-react";
 import { GRADE_THEMES } from "@/data/grade-themes";
 import { getChapters } from "@/data/ncert-maths";
 import { generateChapterQuiz, type QuizQuestion } from "@/lib/quiz.functions";
@@ -13,110 +13,297 @@ export const Route = createFileRoute("/custom")({
   head: () => ({
     meta: [
       { title: "Custom Maths Test · Build Your Own | HBK Maths Quest" },
-      { name: "description", content: "Pick a grade, chapter and number of NCERT Maths questions, then take a custom quiz." },
+      {
+        name: "description",
+        content:
+          "Pick a grade, tick the chapters you want, choose your marks, and take a custom NCERT Maths test.",
+      },
     ],
   }),
   component: CustomPage,
 });
 
+const MARK_CHIPS = [10, 20, 30, 50];
+
+type RunnerQ = QuizQuestion & { _chapterId: number; _chapterTitle: string };
+
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 function CustomPage() {
   const generate = useServerFn(generateChapterQuiz);
   const { recordChapterResult } = useProgress();
   const [grade, setGrade] = useState(5);
-  const [chapterId, setChapterId] = useState(1);
-  const [count, setCount] = useState(10);
-  const [questions, setQuestions] = useState<QuizQuestion[] | null>(null);
+  const [selectedIds, setSelectedIds] = useState<number[]>([1]);
+  const [count, setCount] = useState(20);
+  const [questions, setQuestions] = useState<RunnerQ[] | null>(null);
 
-  const chapters = getChapters(grade);
-  const chapter = chapters.find((c) => c.id === chapterId) ?? chapters[0];
+  const chapters = useMemo(() => getChapters(grade), [grade]);
+
+  const selectedChapters = chapters.filter((c) => selectedIds.includes(c.id));
+  const perChapter = selectedChapters.length
+    ? Math.max(1, Math.ceil(count / selectedChapters.length))
+    : 0;
+
+  function toggleChapter(id: number) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
+
+  function changeGrade(g: number) {
+    setGrade(g);
+    setSelectedIds([1]);
+  }
 
   const mutation = useMutation({
-    mutationFn: async () =>
-      (await generate({ data: { grade, chapterTitle: chapter.title, count } })).questions as QuizQuestion[],
+    mutationFn: async () => {
+      const batches = await Promise.all(
+        selectedChapters.map(async (c) => {
+          const res = await generate({
+            data: { grade, chapterTitle: c.title, count: perChapter },
+          });
+          return res.questions.map((q) => ({
+            ...(q as QuizQuestion),
+            _chapterId: c.id,
+            _chapterTitle: c.title,
+          })) as RunnerQ[];
+        }),
+      );
+      const merged = shuffle(batches.flat()).slice(0, count);
+      if (merged.length === 0) throw new Error("Could not generate questions. Try again.");
+      return merged;
+    },
     onSuccess: (qs) => setQuestions(qs),
   });
 
   if (questions) {
+    const firstChapter = selectedChapters[0];
     return (
       <div className="mx-auto max-w-3xl px-4 py-6">
-        <button onClick={() => setQuestions(null)} className="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1 text-sm font-semibold">
+        <button
+          onClick={() => setQuestions(null)}
+          className="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1 text-sm font-semibold"
+        >
           <ArrowLeft className="h-4 w-4" /> New custom test
         </button>
         <QuizRunner
           questions={questions}
-          title={chapter.title}
-          subtitle={`Custom · Grade ${grade}`}
-          onComplete={(score, total) => recordChapterResult(grade, chapter.id, score, total)}
+          title={`Custom test · ${questions.length} marks`}
+          subtitle={`Grade ${grade} · ${selectedChapters.length} chapter${selectedChapters.length > 1 ? "s" : ""}`}
+          context={
+            firstChapter
+              ? {
+                  grade,
+                  chapterId: firstChapter.id,
+                  chapterTitle: firstChapter.title,
+                }
+              : undefined
+          }
+          onComplete={(score, total) => {
+            // Record results per contributing chapter (proportional to questions used)
+            const counts = new Map<number, { title: string; total: number; correct: number }>();
+            for (const q of questions) {
+              const entry = counts.get(q._chapterId) ?? {
+                title: q._chapterTitle,
+                total: 0,
+                correct: 0,
+              };
+              entry.total += 1;
+              counts.set(q._chapterId, entry);
+            }
+            // Distribute score proportionally across chapters
+            for (const [cid, info] of counts) {
+              const proportionalScore = Math.round((info.total / total) * score);
+              recordChapterResult(grade, cid, proportionalScore, info.total);
+            }
+          }}
         />
       </div>
     );
   }
 
+  const canStart = selectedChapters.length > 0 && !mutation.isPending;
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
-      <Link to="/" className="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1 text-sm font-semibold">
+      <Link
+        to="/"
+        className="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1 text-sm font-semibold"
+      >
         <ArrowLeft className="h-4 w-4" /> Home
       </Link>
 
       <div className="bg-gradient-custom shadow-glow mb-6 rounded-3xl p-6 text-white">
-        <p className="text-xs font-semibold tracking-[0.2em] uppercase opacity-90">Build Your Own</p>
+        <p className="text-xs font-semibold tracking-[0.2em] uppercase opacity-90">
+          Build Your Own
+        </p>
         <h1 className="text-3xl font-extrabold">Custom Test</h1>
+        <p className="mt-1 text-sm opacity-90">
+          Tick the chapters, pick your marks, and get a fresh test.
+        </p>
       </div>
 
-      <div className="bg-card shadow-card space-y-4 rounded-3xl p-6">
+      <div className="bg-card shadow-card space-y-5 rounded-3xl p-6">
+        {/* GRADE */}
         <label className="block">
-          <span className="text-muted-foreground text-xs font-semibold tracking-[0.18em] uppercase">Grade</span>
+          <span className="text-muted-foreground text-xs font-semibold tracking-[0.18em] uppercase">
+            Grade
+          </span>
           <select
             value={grade}
-            onChange={(e) => {
-              const g = Number(e.target.value);
-              setGrade(g);
-              setChapterId(1);
-            }}
+            onChange={(e) => changeGrade(Number(e.target.value))}
             className="border-border bg-card mt-1 w-full rounded-xl border-2 px-4 py-3 font-semibold outline-none"
           >
             {GRADE_THEMES.map((t) => (
-              <option key={t.grade} value={t.grade}>Grade {t.grade} · {t.world}</option>
+              <option key={t.grade} value={t.grade}>
+                Grade {t.grade} · {t.world}
+              </option>
             ))}
           </select>
         </label>
 
-        <label className="block">
-          <span className="text-muted-foreground text-xs font-semibold tracking-[0.18em] uppercase">Chapter</span>
-          <select
-            value={chapterId}
-            onChange={(e) => setChapterId(Number(e.target.value))}
-            className="border-border bg-card mt-1 w-full rounded-xl border-2 px-4 py-3 font-semibold outline-none"
-          >
-            {chapters.map((c) => (
-              <option key={c.id} value={c.id}>{c.id}. {c.title}</option>
-            ))}
-          </select>
-        </label>
+        {/* CHAPTERS — multi-select checklist */}
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-muted-foreground text-xs font-semibold tracking-[0.18em] uppercase">
+              Chapters · pick one or more
+            </span>
+            <div className="flex gap-2 text-xs font-bold">
+              <button
+                onClick={() => setSelectedIds(chapters.map((c) => c.id))}
+                className="text-primary hover:underline"
+              >
+                Select all
+              </button>
+              <span className="text-muted-foreground">·</span>
+              <button
+                onClick={() => setSelectedIds([])}
+                className="text-muted-foreground hover:text-foreground hover:underline"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+          <div className="border-border max-h-64 overflow-y-auto rounded-xl border-2">
+            {chapters.map((c) => {
+              const checked = selectedIds.includes(c.id);
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => toggleChapter(c.id)}
+                  className={`flex w-full items-center gap-3 border-b px-4 py-3 text-left transition last:border-b-0 ${
+                    checked ? "bg-primary/5" : "hover:bg-secondary/50"
+                  }`}
+                >
+                  <span
+                    className={`flex h-5 w-5 flex-none items-center justify-center rounded border-2 transition ${
+                      checked
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border"
+                    }`}
+                  >
+                    {checked && <Check className="h-3 w-3" strokeWidth={3} />}
+                  </span>
+                  <span className="text-sm font-semibold">
+                    {c.id}. {c.title}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-muted-foreground mt-2 text-xs font-semibold">
+            {selectedChapters.length === 0
+              ? "Tick at least one chapter to continue."
+              : `${selectedChapters.length} chapter${selectedChapters.length > 1 ? "s" : ""} selected.`}
+          </p>
+        </div>
 
-        <label className="block">
-          <span className="text-muted-foreground text-xs font-semibold tracking-[0.18em] uppercase">
-            Number of questions: {count}
-          </span>
-          <input
-            type="range"
-            min={5}
-            max={30}
-            value={count}
-            onChange={(e) => setCount(Number(e.target.value))}
-            className="mt-2 w-full"
-          />
-        </label>
+        {/* MARKS */}
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-muted-foreground text-xs font-semibold tracking-[0.18em] uppercase">
+              Marks
+            </span>
+            <span className="text-xs font-bold">≈ {count} marks (1 each)</span>
+          </div>
+
+          <div className="mb-3 flex flex-wrap gap-2">
+            {MARK_CHIPS.map((n) => (
+              <button
+                key={n}
+                onClick={() => setCount(n)}
+                className={`rounded-full border-2 px-4 py-1.5 text-sm font-bold transition ${
+                  count === n
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border hover:border-primary"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setCount((c) => Math.max(5, c - 5))}
+              className="border-border hover:border-primary flex h-10 w-10 items-center justify-center rounded-xl border-2 font-bold"
+              aria-label="Decrease"
+            >
+              <Minus className="h-4 w-4" />
+            </button>
+            <input
+              type="range"
+              min={5}
+              max={50}
+              step={1}
+              value={count}
+              onChange={(e) => setCount(Number(e.target.value))}
+              className="flex-1"
+            />
+            <button
+              type="button"
+              onClick={() => setCount((c) => Math.min(50, c + 5))}
+              className="border-border hover:border-primary flex h-10 w-10 items-center justify-center rounded-xl border-2 font-bold"
+              aria-label="Increase"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+            <div className="bg-secondary w-14 rounded-xl px-3 py-2 text-center font-extrabold">
+              {count}
+            </div>
+          </div>
+
+          {selectedChapters.length > 0 && (
+            <p className="text-muted-foreground mt-2 text-xs">
+              We&apos;ll generate ~{perChapter} question
+              {perChapter > 1 ? "s" : ""} from each of your {selectedChapters.length} chapter
+              {selectedChapters.length > 1 ? "s" : ""} (in parallel — usually under 10 seconds).
+            </p>
+          )}
+        </div>
 
         <button
           onClick={() => mutation.mutate()}
-          disabled={mutation.isPending}
+          disabled={!canStart}
           className="bg-primary text-primary-foreground hover:bg-primary/90 w-full rounded-xl px-5 py-3 font-bold disabled:opacity-50"
         >
-          {mutation.isPending ? "Generating…" : "Start custom test"}
+          {mutation.isPending
+            ? `Generating ${count}-mark test…`
+            : `Start test · ${count} marks`}
         </button>
         {mutation.isError && (
-          <p className="text-destructive text-sm font-semibold">{(mutation.error as Error).message}</p>
+          <p className="text-destructive text-sm font-semibold">
+            {(mutation.error as Error).message}
+          </p>
         )}
       </div>
     </div>
