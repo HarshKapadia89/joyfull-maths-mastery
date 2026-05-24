@@ -262,10 +262,10 @@ export const regenerateVariants = createServerFn({ method: "POST" })
         .parse(data),
   )
   .handler(async ({ data }) => {
-    const systemPrompt = `You are an NCERT Grade ${data.grade} Maths teacher. For each "original" question I give you, produce ONE NEW variant that tests the SAME concept but with different numbers/wording (not a copy). Keep the same type. Follow the same JSON rules as before: MCQ has 4 options with answer matching one; true_false uses options ["True","False"]; plain text math, no LaTeX. One concise explanation each.`;
+    const systemPrompt = `You are an NCERT Grade ${data.grade} Maths teacher. For each "original" question I give you, produce ONE NEW MCQ variant that tests the SAME concept but with different numbers/wording (not a copy). ALL outputs must be MCQ with exactly 4 options; "answer" must match one option exactly. Plain text math, no LaTeX. One concise explanation each. Set "type" to "mcq".`;
     const userPrompt = `Originals:\n${data.basis
-      .map((b, i) => `${i + 1}. [${b.type}] ${b.prompt}  (answer: ${b.answer})`)
-      .join("\n")}\n\nReturn exactly ${data.basis.length} variant questions in the same order.`;
+      .map((b, i) => `${i + 1}. ${b.prompt}  (answer: ${b.answer})`)
+      .join("\n")}\n\nReturn exactly ${data.basis.length} MCQ variants in the same order.`;
     const parsed = await callAI({
       systemPrompt,
       userPrompt,
@@ -274,9 +274,9 @@ export const regenerateVariants = createServerFn({ method: "POST" })
     });
     const validated = z.object({ questions: z.array(QuestionSchema).min(1) }).parse(parsed);
     return {
-      questions: validated.questions.map((q) =>
-        q.type === "true_false" ? { ...q, options: ["True", "False"] } : q,
-      ),
+      questions: validated.questions
+        .filter((q) => q.options && q.options.length === 4 && q.options.includes(q.answer))
+        .map((q) => ({ ...q, type: "mcq" as const })),
     };
   });
 
