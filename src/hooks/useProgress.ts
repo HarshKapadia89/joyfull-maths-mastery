@@ -91,6 +91,9 @@ function mistakeId(grade: number, chapterId: number, prompt: string) {
   return `${grade}-${chapterId}-${prompt.slice(0, 80)}`;
 }
 
+const DAY = 86_400_000;
+const SRS_SCHEDULE = [0, 1, 3, 7, 16]; // days per streak level
+
 export function addMistake(input: {
   grade: number;
   chapterId: number;
@@ -105,6 +108,8 @@ export function addMistake(input: {
     existing.timesWrong += 1;
     existing.studentAnswer = input.studentAnswer;
     existing.savedAt = Date.now();
+    existing.streak = 0;
+    existing.nextDueAt = Date.now(); // due immediately
   } else {
     list.unshift({
       id,
@@ -116,6 +121,8 @@ export function addMistake(input: {
       timesWrong: 1,
       timesRight: 0,
       savedAt: Date.now(),
+      streak: 0,
+      nextDueAt: Date.now(),
     });
   }
   saveMistakes(list);
@@ -127,14 +134,19 @@ export function recordMistakeOutcome(id: string, wasCorrect: boolean) {
   if (!m) return;
   if (wasCorrect) {
     m.timesRight += 1;
-    // Mastered after 2 consecutive correct (we track loosely: 2 total rights)
-    if (m.timesRight >= 2) {
+    m.streak = (m.streak ?? 0) + 1;
+    // Mastered after 2 consecutive correct -> drop from bank
+    if (m.streak >= 2) {
       saveMistakes(list.filter((x) => x.id !== id));
       return;
     }
+    const idx = Math.min(m.streak, SRS_SCHEDULE.length - 1);
+    m.nextDueAt = Date.now() + SRS_SCHEDULE[idx] * DAY;
   } else {
     m.timesWrong += 1;
     m.timesRight = 0;
+    m.streak = 0;
+    m.nextDueAt = Date.now();
   }
   saveMistakes(list);
 }
