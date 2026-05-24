@@ -100,7 +100,7 @@ function ChapterQuiz() {
         >
           <ArrowLeft className="h-4 w-4" /> Back to {theme.world}
         </Link>
-        {data && (
+        {mounted && data && (
           <button
             onClick={regenerate}
             disabled={isFetching}
