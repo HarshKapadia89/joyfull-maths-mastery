@@ -103,7 +103,7 @@ function TutorPage() {
     }
   }
 
-  function send(e: React.FormEvent) {
+  function send(e: React.FormEvent | React.KeyboardEvent<HTMLTextAreaElement>) {
     e.preventDefault();
     if (mode === "photo") {
       if (photoMut.isPending || !imgDataUrl) return;
