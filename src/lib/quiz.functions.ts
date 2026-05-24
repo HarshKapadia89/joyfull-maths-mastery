@@ -546,7 +546,7 @@ export const generateWorksheet = createServerFn({ method: "POST" })
     // Single chapter — existing path
     if (data.chapterTitles.length === 1) {
       const systemPrompt = `You are an NCERT Grade ${data.grade} Maths teacher. Create a printable worksheet of ${count} OPEN-ENDED (NOT MCQ) practice questions for "${data.chapterTitles[0]}". Difficulty rises from easy to hard. Each: marks (1-5) and a concise model solution (3-6 lines). Plain text math, no LaTeX, no markdown.`;
-      const userPrompt = `Worksheet for Grade ${data.grade} – ${data.chapterTitles[1]}. ${count} questions.`;
+    const userPrompt = `Worksheet for Grade ${data.grade} – ${data.chapterTitles[0]}. ${count} questions.`;
       const params = {
         type: "object",
         properties: {
