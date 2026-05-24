@@ -119,13 +119,22 @@ const questionsToolParams = {
   additionalProperties: false,
 } as const;
 
-function buildMcqSystemPrompt(count: number, grade: number, chapterTitle: string) {
+function buildMcqSystemPrompt(
+  count: number,
+  grade: number,
+  chapterTitle: string,
+  difficulty: "easy" | "medium" | "hard" | "mixed" = "mixed",
+) {
+  const diffLine =
+    difficulty === "mixed"
+      ? "- Vary difficulty: mix easy / medium / hard."
+      : `- Target difficulty: ${difficulty}. Most questions should be ${difficulty}.`;
   return `You are an expert NCERT (India) Mathematics teacher. Generate ${count} original MCQ practice questions for Grade ${grade}, chapter "${chapterTitle}".
 
 Rules:
 - ALL questions must be MCQ (multiple choice) with exactly 4 options.
 - "answer" MUST exactly match one of the 4 option strings.
-- Vary difficulty: mix easy / medium / hard.
+${diffLine}
 - Strictly within NCERT Grade ${grade} scope for this chapter.
 - "explanation" is a concise 1-sentence solution.
 - Plain text math only (e.g. "3/4", "x^2", "π", "√2"). No LaTeX, no markdown.
@@ -133,9 +142,14 @@ Rules:
 - Set "type" to "mcq" for every question.`;
 }
 
-async function generateMcqBatch(grade: number, chapterTitle: string, count: number) {
+async function generateMcqBatch(
+  grade: number,
+  chapterTitle: string,
+  count: number,
+  difficulty: "easy" | "medium" | "hard" | "mixed" = "mixed",
+) {
   const parsed = await callAI({
-    systemPrompt: buildMcqSystemPrompt(count, grade, chapterTitle),
+    systemPrompt: buildMcqSystemPrompt(count, grade, chapterTitle, difficulty),
     userPrompt: `Generate ${count} MCQs for Grade ${grade} – ${chapterTitle}.`,
     toolName: "return_questions",
     parameters: questionsToolParams,
@@ -147,23 +161,31 @@ async function generateMcqBatch(grade: number, chapterTitle: string, count: numb
 }
 
 export const generateChapterQuiz = createServerFn({ method: "POST" })
-  .inputValidator((data: { grade: number; chapterTitle: string; count?: number }) =>
+  .inputValidator((data: {
+    grade: number;
+    chapterTitle: string;
+    count?: number;
+    difficulty?: "easy" | "medium" | "hard" | "mixed";
+  }) =>
     z
       .object({
         grade: z.number().int().min(1).max(10),
         chapterTitle: z.string().min(1).max(200),
         count: z.number().int().min(1).max(40).optional(),
+        difficulty: z.enum(["easy", "medium", "hard", "mixed"]).optional(),
       })
       .parse(data),
   )
   .handler(async ({ data }) => {
     const count = data.count ?? 25;
-    // Parallelize into 2 batches for ~2x speed
+    const difficulty = data.difficulty ?? "mixed";
     const half = Math.ceil(count / 2);
     const rest = count - half;
     const [a, b] = await Promise.all([
-      generateMcqBatch(data.grade, data.chapterTitle, half),
-      rest > 0 ? generateMcqBatch(data.grade, data.chapterTitle, rest) : Promise.resolve([]),
+      generateMcqBatch(data.grade, data.chapterTitle, half, difficulty),
+      rest > 0
+        ? generateMcqBatch(data.grade, data.chapterTitle, rest, difficulty)
+        : Promise.resolve([]),
     ]);
     const questions = [...a, ...b].slice(0, count);
     if (questions.length === 0) throw new Error("Failed to generate questions");
