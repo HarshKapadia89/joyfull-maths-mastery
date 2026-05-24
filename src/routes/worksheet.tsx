@@ -133,8 +133,9 @@ function WorksheetPage() {
         </div>
 
         <label className="block">
-          <span className="text-muted-foreground text-xs font-bold tracking-[0.18em] uppercase">Questions: {count}</span>
-          <input type="range" min={5} max={40} value={count} onChange={(e) => setCount(Number(e.target.value))} className="mt-2 w-full" />
+          <span className="text-muted-foreground text-xs font-bold tracking-[0.18em] uppercase">Total marks: {totalMarks}</span>
+          <input type="range" min={5} max={100} step={5} value={totalMarks} onChange={(e) => setTotalMarks(Number(e.target.value))} className="mt-2 w-full" />
+          <p className="text-muted-foreground mt-1 text-xs">Questions are auto-sized (1–5 marks each) to total exactly {totalMarks} marks.</p>
         </label>
 
         <button onClick={() => mut.mutate()} disabled={mut.isPending || selectedIds.length === 0}
