@@ -174,8 +174,8 @@ export const generateDailyChallenge = createServerFn({ method: "POST" })
   .inputValidator((data: { seed?: string }) => z.object({ seed: z.string().max(64).optional() }).parse(data))
   .handler(async ({ data }) => {
     const seed = data.seed ?? new Date().toISOString().slice(0, 10);
-    const systemPrompt = `You are an NCERT Maths teacher. Generate a "Daily Challenge" of 5 mixed Maths questions spanning grades 5-10 NCERT topics. Mix MCQ, fill_blank, true_false, short_answer. Use plain text math, no LaTeX. Each question needs answer + concise explanation + difficulty.`;
-    const userPrompt = `Daily seed: ${seed}. Generate 5 fresh questions.`;
+    const systemPrompt = `You are an NCERT Maths teacher. Generate a "Daily Challenge" of 5 MCQ questions spanning grades 5-10 NCERT topics. ALL questions must be MCQ with exactly 4 options; "answer" must match one option string exactly. Plain text math, no LaTeX. Each needs concise explanation + difficulty. Set "type" to "mcq".`;
+    const userPrompt = `Daily seed: ${seed}. Generate 5 fresh MCQs.`;
     const parsed = await callAI({
       systemPrompt,
       userPrompt,
@@ -184,9 +184,9 @@ export const generateDailyChallenge = createServerFn({ method: "POST" })
     });
     const validated = z.object({ questions: z.array(QuestionSchema).min(1) }).parse(parsed);
     return {
-      questions: validated.questions.map((q) =>
-        q.type === "true_false" ? { ...q, options: ["True", "False"] } : q,
-      ),
+      questions: validated.questions
+        .filter((q) => q.options && q.options.length === 4 && q.options.includes(q.answer))
+        .map((q) => ({ ...q, type: "mcq" as const })),
     };
   });
 
