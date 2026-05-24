@@ -9,15 +9,25 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WorksheetRouteImport } from './routes/worksheet'
 import { Route as TutorRouteImport } from './routes/tutor'
 import { Route as ReviseRouteImport } from './routes/revise'
 import { Route as ProgressRouteImport } from './routes/progress'
+import { Route as ParentRouteImport } from './routes/parent'
+import { Route as MockRouteImport } from './routes/mock'
+import { Route as MisconceptionsRouteImport } from './routes/misconceptions'
 import { Route as DailyRouteImport } from './routes/daily'
 import { Route as CustomRouteImport } from './routes/custom'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as GradeGradeIdRouteImport } from './routes/grade.$gradeId'
+import { Route as FlashcardsGradeIdChapterIdRouteImport } from './routes/flashcards.$gradeId.$chapterId'
 import { Route as GradeGradeIdChapterChapterIdRouteImport } from './routes/grade.$gradeId.chapter.$chapterId'
 
+const WorksheetRoute = WorksheetRouteImport.update({
+  id: '/worksheet',
+  path: '/worksheet',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TutorRoute = TutorRouteImport.update({
   id: '/tutor',
   path: '/tutor',
@@ -31,6 +41,21 @@ const ReviseRoute = ReviseRouteImport.update({
 const ProgressRoute = ProgressRouteImport.update({
   id: '/progress',
   path: '/progress',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ParentRoute = ParentRouteImport.update({
+  id: '/parent',
+  path: '/parent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MockRoute = MockRouteImport.update({
+  id: '/mock',
+  path: '/mock',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MisconceptionsRoute = MisconceptionsRouteImport.update({
+  id: '/misconceptions',
+  path: '/misconceptions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DailyRoute = DailyRouteImport.update({
@@ -53,6 +78,12 @@ const GradeGradeIdRoute = GradeGradeIdRouteImport.update({
   path: '/grade/$gradeId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FlashcardsGradeIdChapterIdRoute =
+  FlashcardsGradeIdChapterIdRouteImport.update({
+    id: '/flashcards/$gradeId/$chapterId',
+    path: '/flashcards/$gradeId/$chapterId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const GradeGradeIdChapterChapterIdRoute =
   GradeGradeIdChapterChapterIdRouteImport.update({
     id: '/chapter/$chapterId',
@@ -64,20 +95,30 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/custom': typeof CustomRoute
   '/daily': typeof DailyRoute
+  '/misconceptions': typeof MisconceptionsRoute
+  '/mock': typeof MockRoute
+  '/parent': typeof ParentRoute
   '/progress': typeof ProgressRoute
   '/revise': typeof ReviseRoute
   '/tutor': typeof TutorRoute
+  '/worksheet': typeof WorksheetRoute
   '/grade/$gradeId': typeof GradeGradeIdRouteWithChildren
+  '/flashcards/$gradeId/$chapterId': typeof FlashcardsGradeIdChapterIdRoute
   '/grade/$gradeId/chapter/$chapterId': typeof GradeGradeIdChapterChapterIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/custom': typeof CustomRoute
   '/daily': typeof DailyRoute
+  '/misconceptions': typeof MisconceptionsRoute
+  '/mock': typeof MockRoute
+  '/parent': typeof ParentRoute
   '/progress': typeof ProgressRoute
   '/revise': typeof ReviseRoute
   '/tutor': typeof TutorRoute
+  '/worksheet': typeof WorksheetRoute
   '/grade/$gradeId': typeof GradeGradeIdRouteWithChildren
+  '/flashcards/$gradeId/$chapterId': typeof FlashcardsGradeIdChapterIdRoute
   '/grade/$gradeId/chapter/$chapterId': typeof GradeGradeIdChapterChapterIdRoute
 }
 export interface FileRoutesById {
@@ -85,10 +126,15 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/custom': typeof CustomRoute
   '/daily': typeof DailyRoute
+  '/misconceptions': typeof MisconceptionsRoute
+  '/mock': typeof MockRoute
+  '/parent': typeof ParentRoute
   '/progress': typeof ProgressRoute
   '/revise': typeof ReviseRoute
   '/tutor': typeof TutorRoute
+  '/worksheet': typeof WorksheetRoute
   '/grade/$gradeId': typeof GradeGradeIdRouteWithChildren
+  '/flashcards/$gradeId/$chapterId': typeof FlashcardsGradeIdChapterIdRoute
   '/grade/$gradeId/chapter/$chapterId': typeof GradeGradeIdChapterChapterIdRoute
 }
 export interface FileRouteTypes {
@@ -97,30 +143,45 @@ export interface FileRouteTypes {
     | '/'
     | '/custom'
     | '/daily'
+    | '/misconceptions'
+    | '/mock'
+    | '/parent'
     | '/progress'
     | '/revise'
     | '/tutor'
+    | '/worksheet'
     | '/grade/$gradeId'
+    | '/flashcards/$gradeId/$chapterId'
     | '/grade/$gradeId/chapter/$chapterId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/custom'
     | '/daily'
+    | '/misconceptions'
+    | '/mock'
+    | '/parent'
     | '/progress'
     | '/revise'
     | '/tutor'
+    | '/worksheet'
     | '/grade/$gradeId'
+    | '/flashcards/$gradeId/$chapterId'
     | '/grade/$gradeId/chapter/$chapterId'
   id:
     | '__root__'
     | '/'
     | '/custom'
     | '/daily'
+    | '/misconceptions'
+    | '/mock'
+    | '/parent'
     | '/progress'
     | '/revise'
     | '/tutor'
+    | '/worksheet'
     | '/grade/$gradeId'
+    | '/flashcards/$gradeId/$chapterId'
     | '/grade/$gradeId/chapter/$chapterId'
   fileRoutesById: FileRoutesById
 }
@@ -128,14 +189,26 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CustomRoute: typeof CustomRoute
   DailyRoute: typeof DailyRoute
+  MisconceptionsRoute: typeof MisconceptionsRoute
+  MockRoute: typeof MockRoute
+  ParentRoute: typeof ParentRoute
   ProgressRoute: typeof ProgressRoute
   ReviseRoute: typeof ReviseRoute
   TutorRoute: typeof TutorRoute
+  WorksheetRoute: typeof WorksheetRoute
   GradeGradeIdRoute: typeof GradeGradeIdRouteWithChildren
+  FlashcardsGradeIdChapterIdRoute: typeof FlashcardsGradeIdChapterIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/worksheet': {
+      id: '/worksheet'
+      path: '/worksheet'
+      fullPath: '/worksheet'
+      preLoaderRoute: typeof WorksheetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tutor': {
       id: '/tutor'
       path: '/tutor'
@@ -155,6 +228,27 @@ declare module '@tanstack/react-router' {
       path: '/progress'
       fullPath: '/progress'
       preLoaderRoute: typeof ProgressRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/parent': {
+      id: '/parent'
+      path: '/parent'
+      fullPath: '/parent'
+      preLoaderRoute: typeof ParentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mock': {
+      id: '/mock'
+      path: '/mock'
+      fullPath: '/mock'
+      preLoaderRoute: typeof MockRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/misconceptions': {
+      id: '/misconceptions'
+      path: '/misconceptions'
+      fullPath: '/misconceptions'
+      preLoaderRoute: typeof MisconceptionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/daily': {
@@ -185,6 +279,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GradeGradeIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/flashcards/$gradeId/$chapterId': {
+      id: '/flashcards/$gradeId/$chapterId'
+      path: '/flashcards/$gradeId/$chapterId'
+      fullPath: '/flashcards/$gradeId/$chapterId'
+      preLoaderRoute: typeof FlashcardsGradeIdChapterIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/grade/$gradeId/chapter/$chapterId': {
       id: '/grade/$gradeId/chapter/$chapterId'
       path: '/chapter/$chapterId'
@@ -211,10 +312,15 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CustomRoute: CustomRoute,
   DailyRoute: DailyRoute,
+  MisconceptionsRoute: MisconceptionsRoute,
+  MockRoute: MockRoute,
+  ParentRoute: ParentRoute,
   ProgressRoute: ProgressRoute,
   ReviseRoute: ReviseRoute,
   TutorRoute: TutorRoute,
+  WorksheetRoute: WorksheetRoute,
   GradeGradeIdRoute: GradeGradeIdRouteWithChildren,
+  FlashcardsGradeIdChapterIdRoute: FlashcardsGradeIdChapterIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
