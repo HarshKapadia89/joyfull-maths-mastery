@@ -22,7 +22,7 @@ function WorksheetPage() {
   const gen = useServerFn(generateWorksheet);
   const [grade, setGrade] = useState(5);
   const [selectedIds, setSelectedIds] = useState<number[]>([1]);
-  const [count, setCount] = useState(10);
+  const [totalMarks, setTotalMarks] = useState(30);
   const [name, setName] = useState("");
   const [items, setItems] = useState<WorksheetItem[] | null>(null);
   const chapters = useMemo(() => getChapters(grade), [grade]);
