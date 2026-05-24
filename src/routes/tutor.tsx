@@ -103,7 +103,7 @@ function TutorPage() {
     }
   }
 
-  function send(e: React.FormEvent) {
+  function send(e: React.FormEvent | React.KeyboardEvent<HTMLTextAreaElement>) {
     e.preventDefault();
     if (mode === "photo") {
       if (photoMut.isPending || !imgDataUrl) return;
@@ -300,13 +300,20 @@ function TutorPage() {
         </div>
       )}
 
-      <form onSubmit={send} className="flex gap-2">
+      <form onSubmit={send} className="flex gap-2 items-end">
         {mode !== "photo" && (
-          <input
+          <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                send(e);
+              }
+            }}
             placeholder={mode === "chat" ? "e.g. Explain LCM with an example" : "e.g. Solve: 3x + 5 = 20"}
-            className="border-border focus:border-primary flex-1 rounded-2xl border-2 bg-card px-4 py-3 font-semibold outline-none"
+            rows={3}
+            className="border-border focus:border-primary flex-1 resize-none rounded-2xl border-2 bg-card px-4 py-4 font-semibold outline-none"
           />
         )}
         <button
@@ -318,10 +325,10 @@ function TutorPage() {
                 ? solveMut.isPending || !input.trim()
                 : photoMut.isPending || !imgDataUrl
           }
-          className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex flex-1 items-center justify-center gap-2 rounded-2xl px-5 py-3 font-bold disabled:opacity-50"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl font-bold disabled:opacity-50"
+          aria-label={mode === "chat" ? "Ask" : mode === "solve" ? "Solve" : "Solve photo"}
         >
-          <Send className="h-4 w-4" />
-          {mode === "chat" ? "Ask" : mode === "solve" ? "Solve" : "Solve photo"}
+          <Send className="h-5 w-5" />
         </button>
       </form>
     </div>
