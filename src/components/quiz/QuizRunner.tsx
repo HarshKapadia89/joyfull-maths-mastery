@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation } from "@tanstack/react-query";
 import { Check, X, ArrowRight, Sparkles, Lightbulb } from "lucide-react";
@@ -60,6 +60,16 @@ export function QuizRunner({
 
   const total = questions.length;
   const q = questions[index];
+
+  // Auto-fire AI explanation as soon as a wrong answer is submitted
+  useEffect(() => {
+    if (submitted && !correct && context && !explanation && !explainMut.isPending) {
+      explainMut.mutate({ q, studentAnswer: input });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submitted, correct, index]);
+
+
 
   function check(value: string) {
     if (submitted) return;
@@ -206,23 +216,38 @@ export function QuizRunner({
           </div>
         )}
 
-        {submitted && !correct && context && !explanation && (
-          <button
-            onClick={() => explainMut.mutate({ q, studentAnswer: input })}
-            disabled={explainMut.isPending}
-            className="border-primary text-primary hover:bg-primary/5 mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 px-5 py-3 font-bold disabled:opacity-50"
-          >
-            <Lightbulb className="h-4 w-4" />
-            {explainMut.isPending ? "HBK Mathy is thinking…" : "Explain why I got this wrong"}
-          </button>
-        )}
-
-        {explanation && (
+        {submitted && !correct && context && (
           <div className="bg-primary/5 border-primary/30 mt-3 rounded-2xl border-2 p-4">
-            <p className="text-primary text-[10px] font-bold tracking-[0.18em] uppercase">HBK Mathy explains</p>
-            <p className="mt-2 text-sm whitespace-pre-wrap">{explanation}</p>
+            <div className="flex items-center gap-2">
+              <Lightbulb className="text-primary h-4 w-4" />
+              <p className="text-primary text-[10px] font-bold tracking-[0.18em] uppercase">
+                Why this is wrong · HBK Mathy
+              </p>
+            </div>
+            {explainMut.isPending && !explanation && (
+              <div className="text-muted-foreground mt-2 flex items-center gap-2 text-sm font-semibold">
+                <div className="border-primary h-3 w-3 animate-spin rounded-full border-2 border-t-transparent" />
+                HBK Mathy is explaining…
+              </div>
+            )}
+            {explanation && (
+              <p className="mt-2 text-sm whitespace-pre-wrap">{explanation}</p>
+            )}
+            {explanation && (
+              <button
+                onClick={() => {
+                  setExplanation(null);
+                  explainMut.reset();
+                  explainMut.mutate({ q, studentAnswer: input });
+                }}
+                className="text-primary mt-3 text-xs font-bold underline-offset-2 hover:underline"
+              >
+                Explain differently
+              </button>
+            )}
           </div>
         )}
+
 
         {submitted && (
           <button

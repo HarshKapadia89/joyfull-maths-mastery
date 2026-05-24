@@ -280,35 +280,49 @@ export const regenerateVariants = createServerFn({ method: "POST" })
     };
   });
 
-// ---------- NEW: Concept cards ----------
+// ---------- Concept cards (expanded) ----------
 const ConceptCardSchema = z.object({
   title: z.string(),
   keyIdea: z.string(),
   example: z.string(),
   pitfall: z.string(),
+  examTip: z.string().optional(),
 });
 export type ConceptCard = z.infer<typeof ConceptCardSchema>;
 
 export const generateConceptCards = createServerFn({ method: "POST" })
-  .inputValidator((data: { grade: number; chapterTitle: string }) =>
-    z
-      .object({
-        grade: z.number().int().min(1).max(10),
-        chapterTitle: z.string().min(1).max(200),
-      })
-      .parse(data),
+  .inputValidator(
+    (data: { grade: number; chapterTitle: string; depth?: "quick" | "deep" }) =>
+      z
+        .object({
+          grade: z.number().int().min(1).max(10),
+          chapterTitle: z.string().min(1).max(200),
+          depth: z.enum(["quick", "deep"]).optional(),
+        })
+        .parse(data),
   )
   .handler(async ({ data }) => {
-    const systemPrompt = `You are an NCERT Grade ${data.grade} Maths teacher. Create exactly 4 concise "concept cards" that recap the chapter "${data.chapterTitle}" so a student can revise in 1 minute before practice. Use plain text math, no LaTeX, no markdown. Keep every field to 1-2 short sentences. Age-appropriate for Grade ${data.grade}. You MUST return 4 cards in the "cards" array.`;
-    const userPrompt = `Make 4 concept cards for Grade ${data.grade} – ${data.chapterTitle}. Return all 4 entries inside the "cards" array.`;
-    const schema = z.object({ cards: z.array(ConceptCardSchema).min(1).max(8) });
+    const depth = data.depth ?? "quick";
+    const target = depth === "deep" ? 8 : 4;
+    const systemPrompt = `You are an NCERT Grade ${data.grade} Maths teacher. Create exactly ${target} concise "concept cards" that recap the chapter "${data.chapterTitle}" so a student can revise${depth === "deep" ? " thoroughly" : " in 1 minute"} before practice.
+
+Cover a VARIETY of angles across the cards: definition, key formula or rule, a fully worked example, a common mistake / pitfall, an exam tip, and any sub-topic the NCERT chapter is famous for.
+
+Rules:
+- Use plain text math (e.g. "3/4", "x^2", "π", "√2"). No LaTeX, no markdown.
+- Each field: 1–2 short sentences, age-appropriate for Grade ${data.grade}.
+- "title" is a short topic label (3–5 words).
+- "examTip" is a 1-line exam-day tip.
+- You MUST return ${target} cards in the "cards" array.`;
+    const userPrompt = `Make ${target} varied concept cards for Grade ${data.grade} – ${data.chapterTitle}.`;
+    const schema = z.object({ cards: z.array(ConceptCardSchema).min(1).max(10) });
     const params = {
       type: "object",
       properties: {
         cards: {
           type: "array",
-          minItems: 3,
-          maxItems: 6,
+          minItems: Math.max(2, target - 2),
+          maxItems: target + 2,
           items: {
             type: "object",
             properties: {
@@ -316,8 +330,9 @@ export const generateConceptCards = createServerFn({ method: "POST" })
               keyIdea: { type: "string" },
               example: { type: "string" },
               pitfall: { type: "string" },
+              examTip: { type: "string" },
             },
-            required: ["title", "keyIdea", "example", "pitfall"],
+            required: ["title", "keyIdea", "example", "pitfall", "examTip"],
             additionalProperties: false,
           },
         },
@@ -343,6 +358,77 @@ export const generateConceptCards = createServerFn({ method: "POST" })
     }
     throw lastErr instanceof Error ? lastErr : new Error("Failed to generate concept cards");
   });
+
+// ---------- Formula sheet ----------
+const FormulaSchema = z.object({
+  name: z.string(),
+  formula: z.string(),
+  whenToUse: z.string(),
+});
+export type Formula = z.infer<typeof FormulaSchema>;
+
+export const generateFormulaSheet = createServerFn({ method: "POST" })
+  .inputValidator((data: { grade: number; chapterTitle: string }) =>
+    z
+      .object({
+        grade: z.number().int().min(1).max(10),
+        chapterTitle: z.string().min(1).max(200),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const systemPrompt = `You are an NCERT Grade ${data.grade} Maths teacher. List every important formula, rule, identity, or property a student needs from the chapter "${data.chapterTitle}".
+
+Rules:
+- Plain text math only ("a^2 + b^2 = c^2", "π", "√2", "x/y"). No LaTeX, no markdown.
+- "name" is a short label (e.g. "Area of triangle").
+- "formula" is the formula itself.
+- "whenToUse" is a 1-line description of when to use it.
+- Return 4–10 entries, ordered from most fundamental to most advanced.
+- If the chapter has very few formulas (e.g. a definitions-heavy chapter), include key properties / rules instead.`;
+    const userPrompt = `Formula sheet for Grade ${data.grade} – ${data.chapterTitle}.`;
+    const schema = z.object({ formulas: z.array(FormulaSchema).min(1).max(15) });
+    const params = {
+      type: "object",
+      properties: {
+        formulas: {
+          type: "array",
+          minItems: 3,
+          maxItems: 12,
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              formula: { type: "string" },
+              whenToUse: { type: "string" },
+            },
+            required: ["name", "formula", "whenToUse"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["formulas"],
+      additionalProperties: false,
+    };
+
+    let lastErr: unknown;
+    for (let i = 0; i < 2; i++) {
+      try {
+        const parsed = await callAI({
+          systemPrompt,
+          userPrompt,
+          toolName: "return_formulas",
+          parameters: params,
+        });
+        const validated = schema.parse(parsed);
+        return { formulas: validated.formulas };
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    throw lastErr instanceof Error ? lastErr : new Error("Failed to generate formula sheet");
+  });
+
 
 // ---------- NEW: Step-by-step solver ----------
 const SolutionSchema = z.object({

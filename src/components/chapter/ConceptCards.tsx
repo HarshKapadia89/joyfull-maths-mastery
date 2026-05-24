@@ -1,22 +1,31 @@
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { BookOpen, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
-import { generateConceptCards, type ConceptCard } from "@/lib/quiz.functions";
+import { BookOpen, ChevronDown, ChevronUp, Sparkles, Calculator, Zap, Layers } from "lucide-react";
+import {
+  generateConceptCards,
+  generateFormulaSheet,
+  type ConceptCard,
+  type Formula,
+} from "@/lib/quiz.functions";
 
-const CACHE_PREFIX = "hbk-concepts-v1:";
+const CARDS_PREFIX = "hbk-concepts-v2:";
+const FORMULAS_PREFIX = "hbk-formulas-v1:";
 
-function readCache(key: string): ConceptCard[] | undefined {
+function readJSON<T>(key: string): T | undefined {
   if (typeof window === "undefined") return undefined;
   try {
     const raw = localStorage.getItem(key);
     if (!raw) return undefined;
-    const parsed = JSON.parse(raw) as ConceptCard[];
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : undefined;
+    const parsed = JSON.parse(raw) as T;
+    return parsed;
   } catch {
     return undefined;
   }
 }
+
+type Tab = "cards" | "formulas";
+type Depth = "quick" | "deep";
 
 export function ConceptCards({
   grade,
@@ -28,20 +37,40 @@ export function ConceptCards({
   chapterTitle: string;
 }) {
   const [open, setOpen] = useState(false);
-  const generate = useServerFn(generateConceptCards);
-  const cacheKey = `${CACHE_PREFIX}${grade}-${chapterId}`;
+  const [tab, setTab] = useState<Tab>("cards");
+  const [depth, setDepth] = useState<Depth>("quick");
 
-  const { data, isPending, isError, error } = useQuery({
-    queryKey: ["concepts", grade, chapterId],
+  const genCards = useServerFn(generateConceptCards);
+  const genFormulas = useServerFn(generateFormulaSheet);
+
+  const cardsKey = `${CARDS_PREFIX}${grade}-${chapterId}-${depth}`;
+  const formulasKey = `${FORMULAS_PREFIX}${grade}-${chapterId}`;
+
+  const cardsQ = useQuery({
+    queryKey: ["concepts", grade, chapterId, depth],
     queryFn: async () => {
-      const res = await generate({ data: { grade, chapterTitle } });
-      try { localStorage.setItem(cacheKey, JSON.stringify(res.cards)); } catch { /* ignore */ }
+      const res = await genCards({ data: { grade, chapterTitle, depth } });
+      try { localStorage.setItem(cardsKey, JSON.stringify(res.cards)); } catch { /* ignore */ }
       return res.cards;
     },
-    initialData: () => readCache(cacheKey),
+    initialData: () => readJSON<ConceptCard[]>(cardsKey),
     staleTime: Infinity,
     gcTime: Infinity,
-    enabled: open,
+    enabled: open && tab === "cards",
+    retry: 1,
+  });
+
+  const formulasQ = useQuery({
+    queryKey: ["formulas", grade, chapterId],
+    queryFn: async () => {
+      const res = await genFormulas({ data: { grade, chapterTitle } });
+      try { localStorage.setItem(formulasKey, JSON.stringify(res.formulas)); } catch { /* ignore */ }
+      return res.formulas;
+    },
+    initialData: () => readJSON<Formula[]>(formulasKey),
+    staleTime: Infinity,
+    gcTime: Infinity,
+    enabled: open && tab === "formulas",
     retry: 1,
   });
 
@@ -57,9 +86,9 @@ export function ConceptCards({
           </span>
           <div className="text-left">
             <p className="text-muted-foreground text-[10px] font-bold tracking-[0.18em] uppercase">
-              Learn first · 1 min recap
+              Learn first · revise smart
             </p>
-            <p className="font-extrabold">Concept cards</p>
+            <p className="font-extrabold">Concept cards &amp; formula sheet</p>
           </div>
         </div>
         {open ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
@@ -67,29 +96,137 @@ export function ConceptCards({
 
       {open && (
         <div className="px-5 pb-5">
-          {isPending && !data && (
-            <div className="text-muted-foreground flex items-center gap-2 py-4 text-sm font-semibold">
-              <div className="border-primary h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
-              Preparing concept cards…
-            </div>
-          )}
-          {isError && !data && (
-            <p className="text-destructive text-sm font-semibold">{(error as Error).message}</p>
-          )}
-          {data && (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {data.map((c, i) => (
-                <div key={i} className="bg-secondary/40 rounded-2xl p-4">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="text-primary h-4 w-4" />
-                    <p className="font-extrabold">{c.title}</p>
-                  </div>
-                  <p className="mt-2 text-sm"><span className="font-bold">Key idea: </span>{c.keyIdea}</p>
-                  <p className="mt-2 text-sm"><span className="font-bold">Example: </span>{c.example}</p>
-                  <p className="text-muted-foreground mt-2 text-sm"><span className="font-bold">Watch out: </span>{c.pitfall}</p>
+          {/* Tabs */}
+          <div className="bg-secondary mb-4 inline-flex rounded-xl p-1">
+            <button
+              onClick={() => setTab("cards")}
+              className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                tab === "cards" ? "bg-card text-foreground shadow" : "text-muted-foreground"
+              }`}
+            >
+              <Layers className="h-3.5 w-3.5" /> Concept cards
+            </button>
+            <button
+              onClick={() => setTab("formulas")}
+              className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                tab === "formulas" ? "bg-card text-foreground shadow" : "text-muted-foreground"
+              }`}
+            >
+              <Calculator className="h-3.5 w-3.5" /> Formula sheet
+            </button>
+          </div>
+
+          {tab === "cards" && (
+            <>
+              <div className="mb-3 flex items-center gap-2">
+                <span className="text-muted-foreground text-[10px] font-bold tracking-[0.18em] uppercase">
+                  Depth
+                </span>
+                <div className="bg-secondary inline-flex rounded-lg p-0.5">
+                  <button
+                    onClick={() => setDepth("quick")}
+                    className={`rounded-md px-2.5 py-1 text-xs font-bold transition ${
+                      depth === "quick" ? "bg-card shadow" : "text-muted-foreground"
+                    }`}
+                  >
+                    Quick (4)
+                  </button>
+                  <button
+                    onClick={() => setDepth("deep")}
+                    className={`rounded-md px-2.5 py-1 text-xs font-bold transition ${
+                      depth === "deep" ? "bg-card shadow" : "text-muted-foreground"
+                    }`}
+                  >
+                    Deep dive (8)
+                  </button>
                 </div>
-              ))}
-            </div>
+              </div>
+
+              {cardsQ.isPending && !cardsQ.data && (
+                <div className="text-muted-foreground flex items-center gap-2 py-4 text-sm font-semibold">
+                  <div className="border-primary h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
+                  Preparing concept cards…
+                </div>
+              )}
+              {cardsQ.isError && !cardsQ.data && (
+                <p className="text-destructive text-sm font-semibold">
+                  {(cardsQ.error as Error).message}
+                </p>
+              )}
+              {cardsQ.data && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {cardsQ.data.map((c, i) => (
+                    <div key={i} className="bg-secondary/40 rounded-2xl p-4">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="text-primary h-4 w-4" />
+                        <p className="font-extrabold">{c.title}</p>
+                      </div>
+                      <p className="mt-2 text-sm">
+                        <span className="font-bold">Key idea: </span>
+                        {c.keyIdea}
+                      </p>
+                      <p className="mt-2 text-sm">
+                        <span className="font-bold">Example: </span>
+                        {c.example}
+                      </p>
+                      <p className="text-muted-foreground mt-2 text-sm">
+                        <span className="font-bold">Watch out: </span>
+                        {c.pitfall}
+                      </p>
+                      {c.examTip && (
+                        <p className="bg-primary/10 text-primary mt-2 flex items-start gap-1.5 rounded-lg p-2 text-xs font-semibold">
+                          <Zap className="mt-0.5 h-3 w-3 flex-none" />
+                          <span>
+                            <span className="font-extrabold">Exam tip: </span>
+                            {c.examTip}
+                          </span>
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {tab === "formulas" && (
+            <>
+              {formulasQ.isPending && !formulasQ.data && (
+                <div className="text-muted-foreground flex items-center gap-2 py-4 text-sm font-semibold">
+                  <div className="border-primary h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
+                  Building formula sheet…
+                </div>
+              )}
+              {formulasQ.isError && !formulasQ.data && (
+                <p className="text-destructive text-sm font-semibold">
+                  {(formulasQ.error as Error).message}
+                </p>
+              )}
+              {formulasQ.data && (
+                <div className="overflow-hidden rounded-2xl border-2 border-border">
+                  {formulasQ.data.map((f, i) => (
+                    <div
+                      key={i}
+                      className="grid grid-cols-1 gap-1 border-b border-border p-3 last:border-b-0 sm:grid-cols-[1fr_1.2fr_1.5fr] sm:items-center sm:gap-3"
+                    >
+                      <p className="text-sm font-extrabold">{f.name}</p>
+                      <p className="bg-secondary rounded-lg px-3 py-1.5 font-mono text-sm">
+                        {f.formula}
+                      </p>
+                      <p className="text-muted-foreground text-xs">{f.whenToUse}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {formulasQ.data && (
+                <button
+                  onClick={() => window.print()}
+                  className="text-primary mt-3 text-xs font-bold underline-offset-2 hover:underline"
+                >
+                  Print formula sheet
+                </button>
+              )}
+            </>
           )}
         </div>
       )}
