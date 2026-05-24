@@ -147,23 +147,31 @@ async function generateMcqBatch(grade: number, chapterTitle: string, count: numb
 }
 
 export const generateChapterQuiz = createServerFn({ method: "POST" })
-  .inputValidator((data: { grade: number; chapterTitle: string; count?: number }) =>
+  .inputValidator((data: {
+    grade: number;
+    chapterTitle: string;
+    count?: number;
+    difficulty?: "easy" | "medium" | "hard" | "mixed";
+  }) =>
     z
       .object({
         grade: z.number().int().min(1).max(10),
         chapterTitle: z.string().min(1).max(200),
         count: z.number().int().min(1).max(40).optional(),
+        difficulty: z.enum(["easy", "medium", "hard", "mixed"]).optional(),
       })
       .parse(data),
   )
   .handler(async ({ data }) => {
     const count = data.count ?? 25;
-    // Parallelize into 2 batches for ~2x speed
+    const difficulty = data.difficulty ?? "mixed";
     const half = Math.ceil(count / 2);
     const rest = count - half;
     const [a, b] = await Promise.all([
-      generateMcqBatch(data.grade, data.chapterTitle, half),
-      rest > 0 ? generateMcqBatch(data.grade, data.chapterTitle, rest) : Promise.resolve([]),
+      generateMcqBatch(data.grade, data.chapterTitle, half, difficulty),
+      rest > 0
+        ? generateMcqBatch(data.grade, data.chapterTitle, rest, difficulty)
+        : Promise.resolve([]),
     ]);
     const questions = [...a, ...b].slice(0, count);
     if (questions.length === 0) throw new Error("Failed to generate questions");
