@@ -42,7 +42,11 @@ function CustomPage() {
   const [grade, setGrade] = useState(5);
   const [selectedIds, setSelectedIds] = useState<number[]>([1]);
   const [count, setCount] = useState(20);
+  const [mode, setMode] = useState<"self" | "timed">("self");
+  const [minutes, setMinutes] = useState(30);
   const [questions, setQuestions] = useState<RunnerQ[] | null>(null);
+  const [deadlineAt, setDeadlineAt] = useState<number | null>(null);
+  const [remaining, setRemaining] = useState(0);
 
   const chapters = useMemo(() => getChapters(grade), [grade]);
 
