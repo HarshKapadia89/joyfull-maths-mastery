@@ -1,22 +1,39 @@
 import { useCallback, useEffect, useState } from "react";
+import type { QuizQuestion } from "@/lib/quiz.functions";
 
 const STORAGE_KEY = "hbk-maths-progress-v1";
+const MISTAKES_KEY = "hbk-mistakes-v1";
+const MAX_MISTAKES = 100;
 
 export type ChapterProgress = {
-  best: number; // best score out of total
-  total: number; // total questions
+  best: number;
+  total: number;
   stars: 0 | 1 | 2 | 3;
   attempts: number;
+  correct?: number; // rolling correct count
+  asked?: number; // rolling asked count
 };
 
 export type ProgressState = {
-  chapters: Record<string, ChapterProgress>; // key = `${grade}-${chapterId}`
+  chapters: Record<string, ChapterProgress>;
   totalStars: number;
-  conceptStars: number; // earned via tutor explorations
+  conceptStars: number;
   xp: number;
   streak: number;
-  lastPlayed: string | null; // YYYY-MM-DD
+  lastPlayed: string | null;
   lastDaily: string | null;
+};
+
+export type StoredMistake = {
+  id: string; // hash-ish key: `${grade}-${chapterId}-${prompt}`
+  grade: number;
+  chapterId: number;
+  chapterTitle: string;
+  question: QuizQuestion;
+  studentAnswer: string;
+  timesWrong: number;
+  timesRight: number;
+  savedAt: number;
 };
 
 const initial: ProgressState = {
@@ -49,6 +66,80 @@ function saveProgress(p: ProgressState) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
 }
 
+export function loadMistakes(): StoredMistake[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(MISTAKES_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw) as StoredMistake[];
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveMistakes(list: StoredMistake[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(MISTAKES_KEY, JSON.stringify(list.slice(0, MAX_MISTAKES)));
+}
+
+function mistakeId(grade: number, chapterId: number, prompt: string) {
+  return `${grade}-${chapterId}-${prompt.slice(0, 80)}`;
+}
+
+export function addMistake(input: {
+  grade: number;
+  chapterId: number;
+  chapterTitle: string;
+  question: QuizQuestion;
+  studentAnswer: string;
+}) {
+  const list = loadMistakes();
+  const id = mistakeId(input.grade, input.chapterId, input.question.prompt);
+  const existing = list.find((m) => m.id === id);
+  if (existing) {
+    existing.timesWrong += 1;
+    existing.studentAnswer = input.studentAnswer;
+    existing.savedAt = Date.now();
+  } else {
+    list.unshift({
+      id,
+      grade: input.grade,
+      chapterId: input.chapterId,
+      chapterTitle: input.chapterTitle,
+      question: input.question,
+      studentAnswer: input.studentAnswer,
+      timesWrong: 1,
+      timesRight: 0,
+      savedAt: Date.now(),
+    });
+  }
+  saveMistakes(list);
+}
+
+export function recordMistakeOutcome(id: string, wasCorrect: boolean) {
+  const list = loadMistakes();
+  const m = list.find((x) => x.id === id);
+  if (!m) return;
+  if (wasCorrect) {
+    m.timesRight += 1;
+    // Mastered after 2 consecutive correct (we track loosely: 2 total rights)
+    if (m.timesRight >= 2) {
+      saveMistakes(list.filter((x) => x.id !== id));
+      return;
+    }
+  } else {
+    m.timesWrong += 1;
+    m.timesRight = 0;
+  }
+  saveMistakes(list);
+}
+
+export function clearMistakes() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(MISTAKES_KEY);
+}
+
 export function useProgress() {
   const [state, setState] = useState<ProgressState>(initial);
   const [hydrated, setHydrated] = useState(false);
@@ -77,6 +168,8 @@ export function useProgress() {
           total,
           stars: bestStars,
           attempts: (existing?.attempts ?? 0) + 1,
+          correct: (existing?.correct ?? 0) + score,
+          asked: (existing?.asked ?? 0) + total,
         };
         const starsDelta = bestStars - (existing?.stars ?? 0);
         const today = todayStr();
@@ -110,7 +203,10 @@ export function useProgress() {
     });
   }, []);
 
-  const reset = useCallback(() => update(initial), [update]);
+  const reset = useCallback(() => {
+    update(initial);
+    clearMistakes();
+  }, [update]);
 
   return { state, hydrated, recordChapterResult, bumpConceptStar, reset };
 }
