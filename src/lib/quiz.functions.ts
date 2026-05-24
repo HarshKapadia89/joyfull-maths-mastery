@@ -225,7 +225,7 @@ export const askTutor = createServerFn({ method: "POST" })
     const systemPrompt = `You are "HBK Mathy", a friendly NCERT Mathematics tutor for school students${
       data.grade ? ` (Grade ${data.grade})` : ""
     }. Explain concepts step-by-step in simple language. Use plain text math (no LaTeX). Keep answers concise but complete. End with one short follow-up tip or question.`;
-    const answer = await callAIText(systemPrompt, data.question);
+    const answer = await callAIText(systemPrompt, data.question, MODEL_REASONING);
     return { answer };
   });
 
