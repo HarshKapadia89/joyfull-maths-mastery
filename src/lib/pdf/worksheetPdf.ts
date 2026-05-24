@@ -50,17 +50,20 @@ export function downloadWorksheetPdf(opts: {
   let y = 48;
   doc.setFontSize(10);
   doc.setTextColor(INK.r, INK.g, INK.b);
+  const MARKS_RESERVE = 26; // mm reserved on the right for the [X marks] badge
   opts.items.forEach((it, i) => {
-    const lines = doc.splitTextToSize(`${i + 1}. ${it.question}`, w - 28);
+    const lines = doc.splitTextToSize(`${i + 1}. ${it.question}`, w - 28 - MARKS_RESERVE);
     const needed = lines.length * 5 + 22;
     if (y + needed > 280) {
       doc.addPage();
       y = 24;
     }
     doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
     doc.setTextColor(INDIGO.r, INDIGO.g, INDIGO.b);
     doc.text(`[${it.marks} mark${it.marks > 1 ? "s" : ""}]`, w - 14, y, { align: "right" });
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
     doc.setTextColor(INK.r, INK.g, INK.b);
     doc.text(lines, 14, y);
     y += lines.length * 5 + 4;
