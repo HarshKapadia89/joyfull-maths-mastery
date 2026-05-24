@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TutorRouteImport } from './routes/tutor'
+import { Route as ReviseRouteImport } from './routes/revise'
 import { Route as ProgressRouteImport } from './routes/progress'
 import { Route as DailyRouteImport } from './routes/daily'
 import { Route as CustomRouteImport } from './routes/custom'
@@ -20,6 +21,11 @@ import { Route as GradeGradeIdChapterChapterIdRouteImport } from './routes/grade
 const TutorRoute = TutorRouteImport.update({
   id: '/tutor',
   path: '/tutor',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReviseRoute = ReviseRouteImport.update({
+  id: '/revise',
+  path: '/revise',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProgressRoute = ProgressRouteImport.update({
@@ -59,6 +65,7 @@ export interface FileRoutesByFullPath {
   '/custom': typeof CustomRoute
   '/daily': typeof DailyRoute
   '/progress': typeof ProgressRoute
+  '/revise': typeof ReviseRoute
   '/tutor': typeof TutorRoute
   '/grade/$gradeId': typeof GradeGradeIdRouteWithChildren
   '/grade/$gradeId/chapter/$chapterId': typeof GradeGradeIdChapterChapterIdRoute
@@ -68,6 +75,7 @@ export interface FileRoutesByTo {
   '/custom': typeof CustomRoute
   '/daily': typeof DailyRoute
   '/progress': typeof ProgressRoute
+  '/revise': typeof ReviseRoute
   '/tutor': typeof TutorRoute
   '/grade/$gradeId': typeof GradeGradeIdRouteWithChildren
   '/grade/$gradeId/chapter/$chapterId': typeof GradeGradeIdChapterChapterIdRoute
@@ -78,6 +86,7 @@ export interface FileRoutesById {
   '/custom': typeof CustomRoute
   '/daily': typeof DailyRoute
   '/progress': typeof ProgressRoute
+  '/revise': typeof ReviseRoute
   '/tutor': typeof TutorRoute
   '/grade/$gradeId': typeof GradeGradeIdRouteWithChildren
   '/grade/$gradeId/chapter/$chapterId': typeof GradeGradeIdChapterChapterIdRoute
@@ -89,6 +98,7 @@ export interface FileRouteTypes {
     | '/custom'
     | '/daily'
     | '/progress'
+    | '/revise'
     | '/tutor'
     | '/grade/$gradeId'
     | '/grade/$gradeId/chapter/$chapterId'
@@ -98,6 +108,7 @@ export interface FileRouteTypes {
     | '/custom'
     | '/daily'
     | '/progress'
+    | '/revise'
     | '/tutor'
     | '/grade/$gradeId'
     | '/grade/$gradeId/chapter/$chapterId'
@@ -107,6 +118,7 @@ export interface FileRouteTypes {
     | '/custom'
     | '/daily'
     | '/progress'
+    | '/revise'
     | '/tutor'
     | '/grade/$gradeId'
     | '/grade/$gradeId/chapter/$chapterId'
@@ -117,6 +129,7 @@ export interface RootRouteChildren {
   CustomRoute: typeof CustomRoute
   DailyRoute: typeof DailyRoute
   ProgressRoute: typeof ProgressRoute
+  ReviseRoute: typeof ReviseRoute
   TutorRoute: typeof TutorRoute
   GradeGradeIdRoute: typeof GradeGradeIdRouteWithChildren
 }
@@ -128,6 +141,13 @@ declare module '@tanstack/react-router' {
       path: '/tutor'
       fullPath: '/tutor'
       preLoaderRoute: typeof TutorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/revise': {
+      id: '/revise'
+      path: '/revise'
+      fullPath: '/revise'
+      preLoaderRoute: typeof ReviseRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/progress': {
@@ -192,6 +212,7 @@ const rootRouteChildren: RootRouteChildren = {
   CustomRoute: CustomRoute,
   DailyRoute: DailyRoute,
   ProgressRoute: ProgressRoute,
+  ReviseRoute: ReviseRoute,
   TutorRoute: TutorRoute,
   GradeGradeIdRoute: GradeGradeIdRouteWithChildren,
 }

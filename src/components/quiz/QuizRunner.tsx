@@ -1,6 +1,10 @@
 import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { useMutation } from "@tanstack/react-query";
+import { Check, X, ArrowRight, Sparkles, Lightbulb } from "lucide-react";
 import type { QuizQuestion } from "@/lib/quiz.functions";
-import { Check, X, ArrowRight, Sparkles } from "lucide-react";
+import { explainMistake } from "@/lib/quiz.functions";
+import { addMistake, recordMistakeOutcome } from "@/hooks/useProgress";
 
 function normalize(s: string) {
   return s.trim().toLowerCase().replace(/\s+/g, " ");
@@ -11,11 +15,22 @@ export function QuizRunner({
   onComplete,
   title,
   subtitle,
+  context,
 }: {
   questions: QuizQuestion[];
   onComplete: (score: number, total: number) => void;
   title: string;
   subtitle?: string;
+  /** Optional: enables mistake bank + revision tracking */
+  context?: {
+    grade: number;
+    chapterId: number;
+    chapterTitle: string;
+    /** If true, treat each question as a revision attempt (update mistake outcomes) */
+    revisionMode?: boolean;
+    /** Map quiz-question index -> mistake id (revisionMode only) */
+    revisionIds?: string[];
+  };
 }) {
   const [index, setIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -23,6 +38,25 @@ export function QuizRunner({
   const [input, setInput] = useState("");
   const [correct, setCorrect] = useState(false);
   const [done, setDone] = useState(false);
+  const [explanation, setExplanation] = useState<string | null>(null);
+
+  const explain = useServerFn(explainMistake);
+  const explainMut = useMutation({
+    mutationFn: async (vars: { q: QuizQuestion; studentAnswer: string }) => {
+      if (!context) throw new Error("No context");
+      return explain({
+        data: {
+          grade: context.grade,
+          chapterTitle: context.chapterTitle,
+          prompt: vars.q.prompt,
+          studentAnswer: vars.studentAnswer,
+          correctAnswer: vars.q.answer,
+        },
+      });
+    },
+    onSuccess: (res) => setExplanation(res.explanation),
+    onError: (err) => setExplanation(`⚠️ ${(err as Error).message}`),
+  });
 
   const total = questions.length;
   const q = questions[index];
@@ -33,6 +67,20 @@ export function QuizRunner({
     setCorrect(isRight);
     setSubmitted(true);
     if (isRight) setScore((s) => s + 1);
+
+    if (context) {
+      if (context.revisionMode && context.revisionIds?.[index]) {
+        recordMistakeOutcome(context.revisionIds[index], isRight);
+      } else if (!isRight) {
+        addMistake({
+          grade: context.grade,
+          chapterId: context.chapterId,
+          chapterTitle: context.chapterTitle,
+          question: q,
+          studentAnswer: value,
+        });
+      }
+    }
   }
 
   function next() {
@@ -45,6 +93,8 @@ export function QuizRunner({
     setSubmitted(false);
     setInput("");
     setCorrect(false);
+    setExplanation(null);
+    explainMut.reset();
   }
 
   if (done) {
@@ -153,6 +203,24 @@ export function QuizRunner({
               {correct ? "✓ Correct!" : `✗ Answer: ${q.answer}`}
             </p>
             <p className="text-foreground mt-1 text-sm">{q.explanation}</p>
+          </div>
+        )}
+
+        {submitted && !correct && context && !explanation && (
+          <button
+            onClick={() => explainMut.mutate({ q, studentAnswer: input })}
+            disabled={explainMut.isPending}
+            className="border-primary text-primary hover:bg-primary/5 mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 px-5 py-3 font-bold disabled:opacity-50"
+          >
+            <Lightbulb className="h-4 w-4" />
+            {explainMut.isPending ? "HBK Mathy is thinking…" : "Explain why I got this wrong"}
+          </button>
+        )}
+
+        {explanation && (
+          <div className="bg-primary/5 border-primary/30 mt-3 rounded-2xl border-2 p-4">
+            <p className="text-primary text-[10px] font-bold tracking-[0.18em] uppercase">HBK Mathy explains</p>
+            <p className="mt-2 text-sm whitespace-pre-wrap">{explanation}</p>
           </div>
         )}
 
