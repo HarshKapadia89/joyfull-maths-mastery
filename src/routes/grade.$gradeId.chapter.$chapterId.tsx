@@ -7,6 +7,7 @@ import { getTheme } from "@/data/grade-themes";
 import { useProgress } from "@/hooks/useProgress";
 import { generateChapterQuiz, type QuizQuestion } from "@/lib/quiz.functions";
 import { QuizRunner } from "@/components/quiz/QuizRunner";
+import { ConceptCards } from "@/components/chapter/ConceptCards";
 
 export const Route = createFileRoute("/grade/$gradeId/chapter/$chapterId")({
   beforeLoad: ({ params }) => {
@@ -118,13 +119,17 @@ function ChapterQuiz() {
       )}
 
       {data && data.length > 0 && (
-        <QuizRunner
-          key={cacheKey}
-          questions={data}
-          title={chapter.title}
-          subtitle={`Grade ${grade} · ${theme.world}`}
-          onComplete={(score, total) => recordChapterResult(grade, cId, score, total)}
-        />
+        <>
+          <ConceptCards grade={grade} chapterId={cId} chapterTitle={chapter.title} />
+          <QuizRunner
+            key={cacheKey}
+            questions={data}
+            title={chapter.title}
+            subtitle={`Grade ${grade} · ${theme.world}`}
+            context={{ grade, chapterId: cId, chapterTitle: chapter.title }}
+            onComplete={(score, total) => recordChapterResult(grade, cId, score, total)}
+          />
+        </>
       )}
     </div>
   );
