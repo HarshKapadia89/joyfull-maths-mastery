@@ -27,6 +27,14 @@ function GradePage() {
   const theme = getTheme(grade);
   const chapters = getChapters(grade);
   const { state } = useProgress();
+  const matchRoute = useMatchRoute();
+  const onChildRoute = matchRoute({
+    to: "/grade/$gradeId/chapter/$chapterId",
+    fuzzy: true,
+  });
+
+  if (onChildRoute) return <Outlet />;
+
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
