@@ -1,67 +1,68 @@
-# Plan: PDF revision pack + strict MCQ-only quizzes
+## 1) Make the Revision Pack PDF stunning + add HBK watermark
 
-## 1) Concept cards & formula sheet → branded PDF download
+**File:** `src/lib/pdf/revisionPdf.ts` (rewrite render layer; keep public API: `downloadConceptCardsPdf`, `downloadFormulaSheetPdf`, `downloadRevisionPackPdf`)
 
-Add a **"Download PDF"** button on both the *Concept cards* and *Formula sheet* tabs in `src/components/chapter/ConceptCards.tsx`. One combined PDF per chapter (cards + formulas + cover), plus the option to download each individually.
+### Visual upgrade
+- **Cover page**: deep indigo→violet gradient (simulated via stacked thin rects), large embossed "HBK" monogram inside a double-ring crest, gold foil-style accent bar, chapter title in serif display (Times) with kicker "REVISION PACK · GRADE N", date + unique pack ID (e.g. `HBK-2026-XXXX`) bottom-right for authenticity.
+- **Section dividers**: full-bleed colored band pages before "Concept Cards" and "Formula Sheet" with oversized numerals (01 / 02) and a one-line intro.
+- **Concept cards**: redesigned tile — colored left rail (rotating palette per card: indigo, emerald, amber, rose), white card body with subtle shadow rect, icon glyph, "KEY IDEA / EXAMPLE / WATCH OUT / EXAM TIP" as small-caps labels with hairline dividers, generous padding, auto-resize text to avoid clipping.
+- **Formula sheet**: two-tone zebra table, monospace formula column on a tinted chip, category grouping headers, "When to use" in italic muted text.
+- **Header/footer on every content page**: thin top rule + HBK wordmark left, chapter · grade center, page X / Y right; footer with school tagline and confidentiality line.
+- **Typography**: Helvetica for UI text, Times for display headings (both built-in to jsPDF — no font loading needed, keeps it fast and reliable).
 
-**Branding (prominent, on every page):**
-- Header: **"The H. B. Kapadia New High School"** in bold, with a sub-line "HBK Maths Quest · Revision Pack".
-- Cover page: school name large, chapter title, grade, date, and a tagline ("Learn smart. Revise smarter.").
-- Footer on every page: school name (left) + page number (right) + small note "For internal student use".
-- Accent color bar matching the app's primary token.
-- (Optional) school logo slot — if a logo file is added later under `src/assets/`, drop it into the header; until then use a typographic crest ("HBK") in a circle.
+### Watermark (security)
+- Diagonal repeating watermark "THE H. B. KAPADIA NEW HIGH SCHOOL" rendered at ~8% opacity, 45° rotation, tiled across the full page behind all content on **every page including cover**.
+- Implemented via `doc.saveGraphicsState() → setGState(new GState({opacity: 0.08})) → rotated text grid → restoreGraphicsState()`.
+- Also stamp a small student-pack ID + generation timestamp in the footer for traceability.
+- Render watermark FIRST per page (before content) so text stays legible on top.
 
-**How:**
-- Use **`jspdf` + `jspdf-autotable`** (lightweight, pure-JS, works in the browser, no server work). Install via `bun add jspdf jspdf-autotable`.
-- New helper `src/lib/pdf/revisionPdf.ts` exporting:
-  - `downloadConceptCardsPdf({ grade, chapterTitle, cards })`
-  - `downloadFormulaSheetPdf({ grade, chapterTitle, formulas })`
-  - `downloadRevisionPackPdf({ grade, chapterTitle, cards, formulas })` ← combined
-- Concept cards rendered as boxed cards (Title, Key idea, Example, Watch out, Exam tip) two per row.
-- Formula sheet rendered as a 3-column table (Name · Formula · When to use) via `autoTable`.
-- File name: `HBK-Maths_Grade-{g}_{slug(chapter)}_Revision-Pack.pdf`.
-- Buttons added in `ConceptCards.tsx`: "Download cards PDF", "Download formula sheet PDF", and a primary "Download full revision pack". The current "Print formula sheet" button is replaced by the PDF button.
+### Robustness
+- Long text → `splitTextToSize` + dynamic card height (no more fixed 70mm clipping for deep dive cards).
+- Page-break aware: cards flow to new pages with header re-drawn automatically.
+- All this stays client-side (jsPDF) — no server cost, instant download.
 
-## 2) Force MCQ everywhere (fix "questions still not all MCQ")
+---
 
-The server already restricts generation to MCQ, but two things still cause non-MCQ behaviour for the student:
+## 2) Suggested next features for student benefit
 
-a. **Stale cached quizzes** in `localStorage` (daily, custom, chapter) generated before the MCQ-only switch — they may contain `fill_blank` / `short_answer` items, which fall through `QuizRunner` to the **text input** branch.
-b. **Defensive fallback** in `QuizRunner` itself renders a typing input whenever `q.options` is missing.
+Grouped by impact. Happy to build any subset next.
 
-**Fixes:**
-- Bump cache keys to invalidate old data:
-  - `hbk-daily-` → `hbk-daily-v2-`
-  - chapter quiz key → add `-v2`
-  - any custom-test cache → `-v2`
-- In `QuizRunner.tsx`, **remove the text-input fallback entirely**. If a question somehow lacks 4 options, skip it (or show a friendly "Question unavailable, click Next") — never show a typing box.
-- Add a client-side guard in the three quiz entry points (`daily.tsx`, `custom.tsx`, chapter quiz route) that filters loaded questions to `q.type === "mcq" && q.options?.length === 4 && q.options.includes(q.answer)` before passing to `QuizRunner`. If the filtered list is empty, auto-regenerate.
+**Learning depth**
+- **Step-by-step solution walkthroughs** — on wrong answer, expand to a numbered 3–5 step solution (not just "why wrong"), with a "Try a similar one" button that generates a twin question.
+- **Worked example videos via text** — AI-generated short "teacher voice" explanations students can read like a transcript.
+- **Misconception library per chapter** — auto-collected from wrong answers across attempts.
 
-## 3) MCQ UX: 4 tappable option cards (no typing)
+**Practice & mastery**
+- **Adaptive difficulty** — quiz auto-adjusts (easy/medium/hard) based on last 5 answers.
+- **Mastery meter per concept** (not just per chapter) — e.g. "Linear equations: 80%, Word problems: 40%".
+- **Spaced revision queue** — home-screen "Revise today" card surfacing weakest concepts on SM-2 schedule.
+- **Mock exam mode** — timed full-syllabus paper with HBK-branded PDF result sheet.
+- **Previous year question bank** — chapter-tagged PYQs with MCQ conversion.
 
-`QuizRunner` already renders option buttons for MCQs — the work here is polish + ensuring it's the only path:
+**Engagement & habit**
+- **Daily streaks + XP + badges** ("7-day streak", "Algebra Ace", "100 MCQs club").
+- **Leaderboard (opt-in, class-level)** with display name only.
+- **Parent weekly digest** (PDF or email) — time spent, accuracy, weak areas.
 
-- Render the 4 options as a **2×2 grid** (1 column on mobile) of large tap targets with A / B / C / D badges on the left.
-- Bigger hit area (min 56px height), bold option text, hover/active states already in the design tokens.
-- After submit: correct option turns green with a check, picked-wrong option turns red with an ✗, the other two dim — same as today but with the new layout.
-- Keyboard shortcuts: pressing **1–4** or **A–D** selects an option.
-- Remove the `<form>` text-input branch (per item 2).
+**Tools**
+- **HBK Doubt-Solver chat** — already have tutor route; add image upload so students photograph a problem.
+- **Formula flashcards mode** — swipeable spaced-repetition cards from the formula sheet.
+- **Offline mode** — cache concept cards + last 50 questions in localStorage for no-network practice.
+- **Printable worksheet generator** — pick chapter + count → branded PDF with answer key on last page.
 
-## Files touched
+**Teacher/admin (future)**
+- Teacher accounts with class roll, assign chapters, view aggregate weak topics.
+- Custom test sharing via link (`/t/abc123`) so teachers send a test to a class.
 
-- `src/lib/pdf/revisionPdf.ts` *(new)* — branded PDF builder
-- `src/components/chapter/ConceptCards.tsx` — PDF download buttons, remove print button
-- `src/components/quiz/QuizRunner.tsx` — drop text-input fallback, 2×2 MCQ grid with A/B/C/D, keyboard shortcuts
-- `src/routes/daily.tsx`, `src/routes/custom.tsx`, `src/routes/grade.$gradeId.chapter.$chapterId.tsx` — bump cache key + MCQ-validity filter on load
-- `package.json` — add `jspdf`, `jspdf-autotable`
+**Accessibility & polish**
+- Hindi/Gujarati toggle for question stems (Lovable AI translate).
+- Larger-text mode + dyslexia-friendly font option.
 
-## Technical notes
+---
 
-- jsPDF runs entirely client-side, so no server function changes are needed for PDFs.
-- Combined revision pack triggers both `generateConceptCards` (deep, 8 cards) and `generateFormulaSheet` in parallel via `Promise.all` before building the PDF, so the user gets the richest content even if they only opened the "Quick" tab.
-- No DB/schema changes.
-- Logo: if you'd like the actual school crest in the PDF, share the image and I'll embed it; otherwise the typographic "HBK" crest ships as default.
+### Technical notes
+- PDF rewrite touches only `src/lib/pdf/revisionPdf.ts`; callers unchanged.
+- jsPDF `GState` for opacity is supported in current `jspdf` version already in `package.json` — no new deps.
+- Watermark text grid: ~6 rows × 3 columns, recalculated per page size.
 
-## Open question
-
-Do you want **one combined "Revision Pack" PDF** (cover + cards + formulas) as the primary button, with individual downloads as secondary — or three equal buttons?
+Tell me which feature(s) from section 2 to queue after the PDF rework, or say "just the PDF" and I'll ship that alone.
