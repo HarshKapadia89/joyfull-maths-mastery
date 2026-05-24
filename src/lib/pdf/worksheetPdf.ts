@@ -23,10 +23,16 @@ export function downloadWorksheetPdf(opts: {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const packId = makePackId();
   const cover = new Set<number>();
+  const titleText =
+    opts.chapterTitles.length === 1
+      ? opts.chapterTitles[1]
+      : opts.chapterTitles.length <= 3
+        ? opts.chapterTitles.join(" + ")
+        : `${opts.chapterTitles[0]} + ${opts.chapterTitles.length - 1} more`;
 
   drawCover(doc, {
     kind: `Worksheet · Grade ${opts.grade}`,
-    title: opts.chapterTitle,
+    title: titleText,
     subtitle: opts.includeAnswers ? "Teacher copy" : "Student copy",
     packId,
   });
@@ -95,6 +101,6 @@ export function downloadWorksheetPdf(opts: {
     });
   }
 
-  finalizePages(doc, `Grade ${opts.grade} · ${opts.chapterTitle}`, packId, cover);
-  doc.save(fileName(opts.grade, opts.chapterTitle, opts.includeAnswers ? "Worksheet-Teacher" : "Worksheet"));
+  finalizePages(doc, `Grade ${opts.grade} · ${titleText}`, packId, cover);
+  doc.save(fileName(opts.grade, titleText, opts.includeAnswers ? "Worksheet-Teacher" : "Worksheet"));
 }

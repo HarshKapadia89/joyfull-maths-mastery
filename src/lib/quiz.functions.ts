@@ -531,49 +531,96 @@ const WorksheetItemSchema = z.object({
 export type WorksheetItem = z.infer<typeof WorksheetItemSchema>;
 
 export const generateWorksheet = createServerFn({ method: "POST" })
-  .inputValidator((data: { grade: number; chapterTitle: string; count?: number }) =>
+  .inputValidator((data: { grade: number; chapterTitles: string[]; count?: number }) =>
     z
       .object({
         grade: z.number().int().min(1).max(10),
-        chapterTitle: z.string().min(1).max(200),
-        count: z.number().int().min(4).max(20).optional(),
+        chapterTitles: z.array(z.string().min(1).max(200)).min(1).max(15),
+        count: z.number().int().min(4).max(40).optional(),
       })
       .parse(data),
   )
   .handler(async ({ data }) => {
     const count = data.count ?? 10;
-    const systemPrompt = `You are an NCERT Grade ${data.grade} Maths teacher. Create a printable worksheet of ${count} OPEN-ENDED (NOT MCQ) practice questions for "${data.chapterTitle}". Difficulty rises from easy to hard. Each: marks (1-5) and a concise model solution (3-6 lines). Plain text math, no LaTeX, no markdown.`;
-    const userPrompt = `Worksheet for Grade ${data.grade} – ${data.chapterTitle}. ${count} questions.`;
-    const params = {
-      type: "object",
-      properties: {
-        items: {
-          type: "array",
-          minItems: 3,
-          maxItems: 20,
+
+    // Single chapter — existing path
+    if (data.chapterTitles.length === 1) {
+      const systemPrompt = `You are an NCERT Grade ${data.grade} Maths teacher. Create a printable worksheet of ${count} OPEN-ENDED (NOT MCQ) practice questions for "${data.chapterTitles[0]}". Difficulty rises from easy to hard. Each: marks (1-5) and a concise model solution (3-6 lines). Plain text math, no LaTeX, no markdown.`;
+      const userPrompt = `Worksheet for Grade ${data.grade} – ${data.chapterTitles[1]}. ${count} questions.`;
+      const params = {
+        type: "object",
+        properties: {
           items: {
-            type: "object",
-            properties: {
-              question: { type: "string" },
-              marks: { type: "number" },
-              solution: { type: "string" },
+            type: "array",
+            minItems: 3,
+            maxItems: 40,
+            items: {
+              type: "object",
+              properties: {
+                question: { type: "string" },
+                marks: { type: "number" },
+                solution: { type: "string" },
+              },
+              required: ["question", "marks", "solution"],
+              additionalProperties: false,
             },
-            required: ["question", "marks", "solution"],
-            additionalProperties: false,
           },
         },
-      },
-      required: ["items"],
-      additionalProperties: false,
-    };
-    const parsed = await callAI({
-      systemPrompt,
-      userPrompt,
-      toolName: "return_worksheet",
-      parameters: params,
-    });
-    const validated = z.object({ items: z.array(WorksheetItemSchema).min(1) }).parse(parsed);
-    return { items: validated.items };
+        required: ["items"],
+        additionalProperties: false,
+      };
+      const parsed = await callAI({
+        systemPrompt,
+        userPrompt,
+        toolName: "return_worksheet",
+        parameters: params,
+      });
+      const validated = z.object({ items: z.array(WorksheetItemSchema).min(1) }).parse(parsed);
+      return { items: validated.items };
+    }
+
+    // Multiple chapters — distribute count and call in parallel
+    const perChapter = Math.max(3, Math.floor(count / data.chapterTitles.length));
+    const batches = await Promise.all(
+      data.chapterTitles.map(async (chapterTitle) => {
+        const systemPrompt = `You are an NCERT Grade ${data.grade} Maths teacher. Create a printable worksheet of ${perChapter} OPEN-ENDED (NOT MCQ) practice questions for "${chapterTitle}". Difficulty rises from easy to hard. Each: marks (1-5) and a concise model solution (3-6 lines). Plain text math, no LaTeX, no markdown.`;
+        const userPrompt = `Worksheet for Grade ${data.grade} – ${chapterTitle}. ${perChapter} questions.`;
+        const params = {
+          type: "object",
+          properties: {
+            items: {
+              type: "array",
+              minItems: 1,
+              maxItems: 40,
+              items: {
+                type: "object",
+                properties: {
+                  question: { type: "string" },
+                  marks: { type: "number" },
+                  solution: { type: "string" },
+                },
+                required: ["question", "marks", "solution"],
+                additionalProperties: false,
+              },
+            },
+          },
+          required: ["items"],
+          additionalProperties: false,
+        };
+        const parsed = await callAI({
+          systemPrompt,
+          userPrompt,
+          toolName: "return_worksheet",
+          parameters: params,
+        });
+        const validated = z.object({ items: z.array(WorksheetItemSchema).min(1) }).parse(parsed);
+        return validated.items;
+      }),
+    );
+
+    const allItems = batches.flat().slice(0, count);
+    if (allItems.length === 0) throw new Error("Failed to generate worksheet items");
+    return { items: allItems };
   });
 
 // ---------- NEW: Solve from image (vision doubt-solver) ----------
