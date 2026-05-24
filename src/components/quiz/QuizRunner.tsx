@@ -38,7 +38,7 @@ export function QuizRunner({
   function next() {
     if (index + 1 >= total) {
       setDone(true);
-      onComplete(score + (submitted && correct ? 0 : 0), total);
+      onComplete(score, total);
       return;
     }
     setIndex((i) => i + 1);
