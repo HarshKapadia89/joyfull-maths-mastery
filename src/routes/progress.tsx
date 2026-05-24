@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Star, Sparkles, Flame, RotateCcw } from "lucide-react";
+import { ArrowLeft, Star, Sparkles, Flame, RotateCcw, Target } from "lucide-react";
 import { useProgress } from "@/hooks/useProgress";
 import { GRADE_THEMES } from "@/data/grade-themes";
 import { getChapters } from "@/data/ncert-maths";
@@ -16,6 +16,21 @@ export const Route = createFileRoute("/progress")({
 
 function ProgressPage() {
   const { state, reset } = useProgress();
+
+  // Compute weak topics: chapters with >= 5 asked, sorted by accuracy ascending
+  type Weak = { grade: number; chapterId: number; chapterTitle: string; accuracy: number; asked: number };
+  const weakTopics: Weak[] = [];
+  for (const t of GRADE_THEMES) {
+    const chapters = getChapters(t.grade);
+    for (const c of chapters) {
+      const p = state.chapters[`${t.grade}-${c.id}`];
+      if (!p?.asked || p.asked < 5) continue;
+      const accuracy = (p.correct ?? 0) / p.asked;
+      weakTopics.push({ grade: t.grade, chapterId: c.id, chapterTitle: c.title, accuracy, asked: p.asked });
+    }
+  }
+  weakTopics.sort((a, b) => a.accuracy - b.accuracy);
+  const focusAreas = weakTopics.filter((w) => w.accuracy < 0.8).slice(0, 3);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
@@ -43,6 +58,49 @@ function ProgressPage() {
           </div>
         </div>
       </div>
+
+      {focusAreas.length > 0 && (
+        <div className="bg-card shadow-card mb-6 rounded-3xl p-6">
+          <div className="mb-4 flex items-center gap-2">
+            <Target className="text-primary h-5 w-5" />
+            <h2 className="text-lg font-extrabold">Focus areas</h2>
+          </div>
+          <p className="text-muted-foreground mb-4 text-sm">
+            These chapters need a little more love. Tap to practise.
+          </p>
+          <div className="space-y-3">
+            {focusAreas.map((w) => {
+              const pct = Math.round(w.accuracy * 100);
+              return (
+                <Link
+                  key={`${w.grade}-${w.chapterId}`}
+                  to="/grade/$gradeId/chapter/$chapterId"
+                  params={{ gradeId: String(w.grade), chapterId: String(w.chapterId) }}
+                  className="bg-secondary/40 hover:bg-secondary block rounded-2xl p-4 transition"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-muted-foreground text-[10px] font-bold tracking-[0.18em] uppercase">
+                        Grade {w.grade}
+                      </p>
+                      <p className="truncate font-extrabold">{w.chapterTitle}</p>
+                    </div>
+                    <p className={`text-lg font-extrabold ${pct < 50 ? "text-destructive" : "text-primary"}`}>
+                      {pct}%
+                    </p>
+                  </div>
+                  <div className="bg-background mt-2 h-2 overflow-hidden rounded-full">
+                    <div
+                      className={`h-full ${pct < 50 ? "bg-destructive" : "bg-primary"}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="space-y-3">
         {GRADE_THEMES.map((t) => {
