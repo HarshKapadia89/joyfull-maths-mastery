@@ -134,14 +134,15 @@ function buildMcqSystemPrompt(
     difficulty === "mixed"
       ? "- Vary difficulty: mix easy / medium / hard."
       : `- Target difficulty: ${difficulty}. Most questions should be ${difficulty}.`;
-  return `You are an expert NCERT (India) Mathematics teacher. Generate ${count} original MCQ practice questions for Grade ${grade}, chapter "${chapterTitle}".
+  return `You are an expert NCERT (India) Mathematics teacher of tuition-class quality. Generate ${count} original MCQ practice questions for Grade ${grade}, chapter "${chapterTitle}".
 
 Rules:
 - ALL questions must be MCQ (multiple choice) with exactly 4 options.
 - "answer" MUST exactly match one of the 4 option strings.
 ${diffLine}
 - Strictly within NCERT Grade ${grade} scope for this chapter.
-- "explanation" is a concise 1-sentence solution.
+- Aim for a Bloom's taxonomy mix: ~30% recall/understanding, ~40% application, ~30% HOTS (analysis / reasoning / word problems). NCERT-exemplar-style for higher grades.
+- "explanation" is a 2–4 sentence solution that shows the METHOD (not just the answer), so a student learns from it.
 - Plain text math only (e.g. "3/4", "x^2", "π", "√2"). No LaTeX, no markdown.
 - Each question must be unambiguous and age-appropriate.
 - Set "type" to "mcq" for every question.`;
