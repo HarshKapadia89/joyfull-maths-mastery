@@ -399,31 +399,6 @@ Rules:
       required: ["cards"],
       additionalProperties: false,
     };
-    const schema = z.object({ cards: z.array(ConceptCardSchema).min(1).max(10) });
-    const params = {
-      type: "object",
-      properties: {
-        cards: {
-          type: "array",
-          minItems: Math.max(2, target - 2),
-          maxItems: target + 2,
-          items: {
-            type: "object",
-            properties: {
-              title: { type: "string" },
-              keyIdea: { type: "string" },
-              example: { type: "string" },
-              pitfall: { type: "string" },
-              examTip: { type: "string" },
-            },
-            required: ["title", "keyIdea", "example", "pitfall", "examTip"],
-            additionalProperties: false,
-          },
-        },
-      },
-      required: ["cards"],
-      additionalProperties: false,
-    };
 
     let lastErr: unknown;
     for (let i = 0; i < 2; i++) {
