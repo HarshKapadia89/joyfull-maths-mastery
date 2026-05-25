@@ -375,17 +375,44 @@ export function ConceptCards({
                 </p>
               )}
               {formulasQ.data && (
-                <div className="border-border overflow-hidden rounded-2xl border-2">
+                <div className="space-y-2">
                   {formulasQ.data.map((f, i) => (
-                    <div
-                      key={i}
-                      className="border-border grid grid-cols-1 gap-1 border-b p-3 last:border-b-0 sm:grid-cols-[1fr_1.2fr_1.5fr] sm:items-center sm:gap-3"
-                    >
-                      <p className="text-sm font-extrabold">{f.name}</p>
-                      <p className="bg-secondary rounded-lg px-3 py-1.5 font-mono text-sm">
-                        {f.formula}
-                      </p>
-                      <p className="text-muted-foreground text-xs">{f.whenToUse}</p>
+                    <div key={i} className="border-border bg-card rounded-2xl border-2 p-3">
+                      <div className="grid grid-cols-1 gap-1 sm:grid-cols-[1fr_1.2fr_1.5fr] sm:items-center sm:gap-3">
+                        <p className="text-sm font-extrabold">{f.name}</p>
+                        <p className="bg-secondary rounded-lg px-3 py-1.5 font-mono text-sm">
+                          {f.formula}
+                        </p>
+                        <p className="text-muted-foreground text-xs">{f.whenToUse}</p>
+                      </div>
+                      {(f.derivation || f.conditions || f.commonMistake || f.relatedFormula) && (
+                        <div className="mt-2 grid gap-1.5 text-xs sm:grid-cols-2">
+                          {f.derivation && (
+                            <p className="bg-secondary/40 rounded-lg p-2">
+                              <span className="font-extrabold">Derivation: </span>
+                              {f.derivation}
+                            </p>
+                          )}
+                          {f.conditions && (
+                            <p className="bg-secondary/40 rounded-lg p-2">
+                              <span className="font-extrabold">Valid when: </span>
+                              {f.conditions}
+                            </p>
+                          )}
+                          {f.commonMistake && (
+                            <p className="bg-amber-50 text-amber-900 rounded-lg p-2">
+                              <span className="font-extrabold">Watch out: </span>
+                              {f.commonMistake}
+                            </p>
+                          )}
+                          {f.relatedFormula && (
+                            <p className="text-muted-foreground rounded-lg p-2">
+                              <span className="font-extrabold">Related: </span>
+                              {f.relatedFormula}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
