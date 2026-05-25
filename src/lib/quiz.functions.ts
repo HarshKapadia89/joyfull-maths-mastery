@@ -286,7 +286,7 @@ Final answer: <the correct answer>
 Try this next: <one short similar practice question, no answer>
 
 Be encouraging. Age-appropriate language for Grade ${data.grade}.`;
-    const userPrompt = `Question: ${data.prompt}\nMy answer: ${data.studentAnswer || "(blank)"}\nCorrect answer: ${data.correctAnswer}`;
+    const userPrompt = `Question: ${data.prompt}\nMy answer: ${data.studentAnswer || "(blank)"}\nCorrect answer: ${data.correctAnswer}\n\nAfter the standard structure, also add a final line:\nPrerequisite to revise: <name of the earlier concept/topic the student should brush up on>`;
     const explanation = await callAIText(systemPrompt, userPrompt);
     return { explanation };
   });
