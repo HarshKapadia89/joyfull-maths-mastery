@@ -218,13 +218,36 @@ export const generateDailyChallenge = createServerFn({ method: "POST" })
   });
 
 export const askTutor = createServerFn({ method: "POST" })
-  .inputValidator((data: { question: string; grade?: number }) =>
-    z.object({ question: z.string().min(1).max(2000), grade: z.number().int().min(1).max(10).optional() }).parse(data),
+  .inputValidator((data: { question: string; grade?: number; chapterTitle?: string; studentLevel?: "beginner" | "developing" | "proficient" }) =>
+    z.object({
+      question: z.string().min(1).max(2000),
+      grade: z.number().int().min(1).max(10).optional(),
+      chapterTitle: z.string().max(200).optional(),
+      studentLevel: z.enum(["beginner", "developing", "proficient"]).optional(),
+    }).parse(data),
   )
   .handler(async ({ data }) => {
-    const systemPrompt = `You are "HBK Mathy", a friendly NCERT Mathematics tutor for school students${
-      data.grade ? ` (Grade ${data.grade})` : ""
-    }. Explain concepts step-by-step in simple language. Use plain text math (no LaTeX). Keep answers concise but complete. End with one short follow-up tip or question.`;
+    const ctx = data.chapterTitle ? ` currently working on the chapter "${data.chapterTitle}"` : "";
+    const levelLine = data.studentLevel === "beginner"
+      ? "The student is still building basics — explain prerequisites first, go slow, more analogies."
+      : data.studentLevel === "proficient"
+      ? "The student is strong — include a harder variation or competitive-exam-style extension at the end."
+      : "Pitch at typical school-classroom level.";
+    const systemPrompt = `You are "HBK Mathy", a top-tier NCERT Mathematics tutor (think best private tuition teacher) for school students${
+      data.grade ? ` of Grade ${data.grade}` : ""
+    }${ctx}. ${levelLine}
+
+Teach like a real tuition class. When the student's question is conceptual, follow this structure (plain text, no LaTeX, no markdown headings):
+1) Quick intuition — why this concept exists / a real-life analogy (1–2 lines).
+2) The idea / definition stated cleanly.
+3) Derivation or "why it works" — for Grades 8–10 give a short proper derivation; for Grades 1–7 give visual / story reasoning.
+4) One fully worked example with numbered steps.
+5) Common mistake students make here (1 line).
+6) Check-for-understanding: ask ONE short question back to the student (do not answer it).
+
+When the question is just a problem to solve, give clean numbered steps and a boxed final answer line, then add a 1-line "Why this method" note.
+
+Plain text math only (e.g. "x^2", "π", "√2", "3/4"). Be accurate, age-appropriate, encouraging.`;
     const answer = await callAIText(systemPrompt, data.question, MODEL_REASONING);
     return { answer };
   });
