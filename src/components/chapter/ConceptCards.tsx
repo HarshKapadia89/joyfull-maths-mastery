@@ -1,7 +1,20 @@
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { BookOpen, ChevronDown, ChevronUp, Sparkles, Calculator, Zap, Layers, Download, FileDown } from "lucide-react";
+import {
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
+  Calculator,
+  Zap,
+  Layers,
+  Download,
+  FileDown,
+  Map,
+  BookText,
+  GraduationCap,
+} from "lucide-react";
 import {
   generateConceptCards,
   generateFormulaSheet,
@@ -13,9 +26,10 @@ import {
   downloadFormulaSheetPdf,
   downloadRevisionPackPdf,
 } from "@/lib/pdf/revisionPdf";
+import { LearningPathway, SolvedExamples, ExamCorner } from "@/components/chapter/DeepLearning";
 
-const CARDS_PREFIX = "hbk-concepts-v2:";
-const FORMULAS_PREFIX = "hbk-formulas-v1:";
+const CARDS_PREFIX = "hbk-concepts-v3:";
+const FORMULAS_PREFIX = "hbk-formulas-v2:";
 
 function readJSON<T>(key: string): T | undefined {
   if (typeof window === "undefined") return undefined;
@@ -28,7 +42,7 @@ function readJSON<T>(key: string): T | undefined {
   }
 }
 
-type Tab = "cards" | "formulas";
+type Tab = "pathway" | "cards" | "formulas" | "solved" | "exam";
 type Depth = "quick" | "deep";
 
 export function ConceptCards({
