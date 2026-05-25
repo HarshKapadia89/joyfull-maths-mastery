@@ -620,7 +620,7 @@ export const generateWorksheet = createServerFn({ method: "POST" })
     };
 
     async function generateForChapter(chapterTitle: string, qCount: number, marksBudget: number) {
-      const systemPrompt = `You are an NCERT Grade ${data.grade} Maths teacher. Create a printable worksheet of approximately ${qCount} OPEN-ENDED (NOT MCQ) practice questions for "${chapterTitle}". Difficulty rises from easy to hard. Each question carries marks between 1 and 5. The marks of all questions MUST sum to exactly ${marksBudget}. Include a concise model solution (3-6 lines). Plain text math, no LaTeX, no markdown.`;
+      const systemPrompt = `You are a top NCERT Grade ${data.grade} Maths teacher of tuition-class quality. Create a printable worksheet of approximately ${qCount} OPEN-ENDED (NOT MCQ) practice questions for "${chapterTitle}". Difficulty rises from easy to hard. Each question carries marks between 1 and 5. The marks of all questions MUST sum to exactly ${marksBudget}. Include a model solution (3-6 lines) that shows the method. 5-mark questions should be Board-exam-style case studies or multi-part HOTS questions (label sub-parts (a), (b), (c)). 1–2 mark questions test recall/direct application. Plain text math, no LaTeX, no markdown.`;
       const userPrompt = `Worksheet for Grade ${data.grade} – ${chapterTitle}. About ${qCount} questions totalling exactly ${marksBudget} marks.`;
       const parsed = await callAI({
         systemPrompt,
