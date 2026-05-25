@@ -318,6 +318,24 @@ export function ConceptCards({
                         <span className="font-bold">Watch out: </span>
                         {c.pitfall}
                       </p>
+                      {c.derivation && (
+                        <p className="bg-card mt-2 rounded-lg p-2 text-xs">
+                          <span className="font-extrabold">{grade >= 8 ? "Derivation" : "Why it works"}: </span>
+                          {c.derivation}
+                        </p>
+                      )}
+                      {c.prerequisites && (
+                        <p className="text-muted-foreground mt-2 text-xs">
+                          <span className="font-bold">Prerequisites: </span>
+                          {c.prerequisites}
+                        </p>
+                      )}
+                      {c.relatedTopics && (
+                        <p className="text-muted-foreground mt-1 text-xs">
+                          <span className="font-bold">Related: </span>
+                          {c.relatedTopics}
+                        </p>
+                      )}
                       {c.examTip && (
                         <p className="bg-primary/10 text-primary mt-2 flex items-start gap-1.5 rounded-lg p-2 text-xs font-semibold">
                           <Zap className="mt-0.5 h-3 w-3 flex-none" />
