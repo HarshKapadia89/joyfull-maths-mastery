@@ -799,3 +799,270 @@ export const summarizeMisconceptions = createServerFn({ method: "POST" })
     const validated = z.object({ clusters: z.array(MisconceptionSchema).min(1) }).parse(parsed);
     return { clusters: validated.clusters };
   });
+
+// ============================================================
+// DEEP LEARNING (tuition-class) — additive, no removals
+// ============================================================
+
+// ---------- Chapter learning pathway (topic roadmap) ----------
+const PathwayTopicSchema = z.object({
+  title: z.string(),
+  oneLiner: z.string(),
+});
+export type PathwayTopic = z.infer<typeof PathwayTopicSchema>;
+
+export const generateChapterPathway = createServerFn({ method: "POST" })
+  .inputValidator((data: { grade: number; chapterTitle: string }) =>
+    z.object({
+      grade: z.number().int().min(1).max(10),
+      chapterTitle: z.string().min(1).max(200),
+    }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const systemPrompt = `You are a senior NCERT Grade ${data.grade} Maths teacher planning a tuition-class study pathway for the chapter "${data.chapterTitle}".
+Break the chapter into an ORDERED list of 5–9 atomic topics/sub-concepts, the way a real teacher would pace it across multiple sittings — easiest foundations first, applications/word problems last. Each topic gets a 1-line description of what the student will learn there. Plain text only, no LaTeX, no markdown.`;
+    const params = {
+      type: "object",
+      properties: {
+        topics: {
+          type: "array",
+          minItems: 4,
+          maxItems: 10,
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              oneLiner: { type: "string" },
+            },
+            required: ["title", "oneLiner"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["topics"],
+      additionalProperties: false,
+    };
+    const parsed = await callAI({
+      systemPrompt,
+      userPrompt: `Build the ordered learning pathway for Grade ${data.grade} – ${data.chapterTitle}.`,
+      toolName: "return_pathway",
+      parameters: params,
+      model: MODEL_REASONING,
+    });
+    const validated = z.object({ topics: z.array(PathwayTopicSchema).min(1) }).parse(parsed);
+    return { topics: validated.topics };
+  });
+
+// ---------- Topic mini-lesson ----------
+const TopicLessonSchema = z.object({
+  prerequisites: z.string().optional(),
+  intuition: z.string(),
+  definition: z.string(),
+  derivation: z.string().optional(),
+  workedExamples: z.array(z.object({
+    problem: z.string(),
+    steps: z.array(z.string()).min(1).max(10),
+    finalAnswer: z.string(),
+  })).min(1).max(4),
+  commonMistakes: z.array(z.string()).min(1).max(4),
+  practiceCheck: z.array(z.object({
+    question: z.string(),
+    answer: z.string(),
+  })).min(1).max(3),
+  whatsNext: z.string().optional(),
+});
+export type TopicLesson = z.infer<typeof TopicLessonSchema>;
+
+export const generateTopicLesson = createServerFn({ method: "POST" })
+  .inputValidator((data: { grade: number; chapterTitle: string; topicTitle: string; nextTopicTitle?: string }) =>
+    z.object({
+      grade: z.number().int().min(1).max(10),
+      chapterTitle: z.string().min(1).max(200),
+      topicTitle: z.string().min(1).max(200),
+      nextTopicTitle: z.string().max(200).optional(),
+    }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const isUpper = data.grade >= 8;
+    const derivationLine = isUpper
+      ? `"derivation" — a proper short proof / derivation in 2–5 lines when applicable. Omit if this topic is purely definitional.`
+      : `"derivation" — a "why it works" visual / story explanation in 2–4 lines. No formal algebra.`;
+    const systemPrompt = `You are the best NCERT Grade ${data.grade} Maths tuition teacher. Teach the topic "${data.topicTitle}" from the chapter "${data.chapterTitle}" the way you would in a 1-on-1 class. Tuition-class depth, age-appropriate for Grade ${data.grade}. Plain text math only ("x^2", "π", "√2"). No LaTeX, no markdown.
+
+Fields:
+- "prerequisites" — 1 line naming the earlier concept the student should know.
+- "intuition" — 1–3 lines: why this concept exists / a real-life analogy.
+- "definition" — the formal definition or statement, clean.
+- ${derivationLine}
+- "workedExamples" — 2 to 3 fully worked examples, graded easy → hard, each with numbered steps and final answer.
+- "commonMistakes" — 2 to 3 specific mistakes students actually make on THIS topic.
+- "practiceCheck" — 2 short self-check questions with their answers.
+- "whatsNext" — 1 line pointing to ${data.nextTopicTitle ? `the next topic ("${data.nextTopicTitle}")` : "what to study next"}.`;
+    const params = {
+      type: "object",
+      properties: {
+        prerequisites: { type: "string" },
+        intuition: { type: "string" },
+        definition: { type: "string" },
+        derivation: { type: "string" },
+        workedExamples: {
+          type: "array",
+          minItems: 1, maxItems: 4,
+          items: {
+            type: "object",
+            properties: {
+              problem: { type: "string" },
+              steps: { type: "array", items: { type: "string" } },
+              finalAnswer: { type: "string" },
+            },
+            required: ["problem", "steps", "finalAnswer"],
+            additionalProperties: false,
+          },
+        },
+        commonMistakes: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 4 },
+        practiceCheck: {
+          type: "array",
+          minItems: 1, maxItems: 3,
+          items: {
+            type: "object",
+            properties: { question: { type: "string" }, answer: { type: "string" } },
+            required: ["question", "answer"],
+            additionalProperties: false,
+          },
+        },
+        whatsNext: { type: "string" },
+      },
+      required: ["intuition", "definition", "workedExamples", "commonMistakes", "practiceCheck"],
+      additionalProperties: false,
+    };
+    const parsed = await callAI({
+      systemPrompt,
+      userPrompt: `Teach "${data.topicTitle}" (chapter: ${data.chapterTitle}) for Grade ${data.grade}.`,
+      toolName: "return_lesson",
+      parameters: params,
+      model: MODEL_REASONING,
+    });
+    return TopicLessonSchema.parse(parsed);
+  });
+
+// ---------- Solved Examples (NCERT-textbook style) ----------
+const SolvedExampleSchema = z.object({
+  title: z.string(),
+  given: z.string(),
+  toFind: z.string(),
+  method: z.string(),
+  steps: z.array(z.string()).min(1).max(12),
+  finalAnswer: z.string(),
+  alternateMethod: z.string().optional(),
+  difficulty: z.enum(["easy", "medium", "hard"]),
+});
+export type SolvedExample = z.infer<typeof SolvedExampleSchema>;
+
+export const generateSolvedExamples = createServerFn({ method: "POST" })
+  .inputValidator((data: { grade: number; chapterTitle: string; count?: number }) =>
+    z.object({
+      grade: z.number().int().min(1).max(10),
+      chapterTitle: z.string().min(1).max(200),
+      count: z.number().int().min(4).max(12).optional(),
+    }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const count = data.count ?? 8;
+    const systemPrompt = `You are a senior NCERT Grade ${data.grade} Maths teacher. Produce ${count} solved examples for the chapter "${data.chapterTitle}", in classic NCERT-textbook style. Grade them easy → medium → hard. For each: a short title, "Given", "To find / prove", a 1-line note on which Method/approach you'll use and why, then numbered solution steps, a clearly stated final answer, and OPTIONALLY a brief alternate method when one exists. Plain text math only. No LaTeX, no markdown.`;
+    const params = {
+      type: "object",
+      properties: {
+        examples: {
+          type: "array",
+          minItems: 4, maxItems: 12,
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              given: { type: "string" },
+              toFind: { type: "string" },
+              method: { type: "string" },
+              steps: { type: "array", items: { type: "string" } },
+              finalAnswer: { type: "string" },
+              alternateMethod: { type: "string" },
+              difficulty: { type: "string", enum: ["easy", "medium", "hard"] },
+            },
+            required: ["title", "given", "toFind", "method", "steps", "finalAnswer", "difficulty"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["examples"],
+      additionalProperties: false,
+    };
+    const parsed = await callAI({
+      systemPrompt,
+      userPrompt: `${count} graded solved examples for Grade ${data.grade} – ${data.chapterTitle}.`,
+      toolName: "return_examples",
+      parameters: params,
+      model: MODEL_REASONING,
+    });
+    const validated = z.object({ examples: z.array(SolvedExampleSchema).min(1) }).parse(parsed);
+    return { examples: validated.examples };
+  });
+
+// ---------- Exam Corner (PYQ-style / Olympiad-style by grade) ----------
+const ExamQuestionSchema = z.object({
+  question: z.string(),
+  marks: z.number().int().min(1).max(6),
+  examinerExpects: z.string(),
+  modelAnswer: z.string(),
+  timeTip: z.string().optional(),
+  source: z.string().optional(),
+});
+export type ExamQuestion = z.infer<typeof ExamQuestionSchema>;
+
+export const generateExamCorner = createServerFn({ method: "POST" })
+  .inputValidator((data: { grade: number; chapterTitle: string }) =>
+    z.object({
+      grade: z.number().int().min(1).max(10),
+      chapterTitle: z.string().min(1).max(200),
+    }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const isBoard = data.grade >= 9;
+    const styleLine = isBoard
+      ? `Style: CBSE Board exam / PYQ pattern, including 1-mark, 2-mark, 3-mark and 5-mark case-study/HOTS questions. Mention typical CBSE marking scheme cues in "examinerExpects".`
+      : `Style: school unit-test + Olympiad/NTSE-foundation style. Short objective + reasoning questions.`;
+    const systemPrompt = `You are an experienced NCERT Grade ${data.grade} Maths teacher who also coaches for exams. Produce 6–8 high-yield exam-style questions for the chapter "${data.chapterTitle}".
+${styleLine}
+For each: the question, the marks it carries, a 1–2 line "examinerExpects" note (what fetches full marks: which formula to quote, units, diagram, etc.), a clean MODEL answer that would score full marks, and a short time-management tip. If relevant, mention a plausible "source" tag like "CBSE Board pattern", "NTSE-style", or "Olympiad-style". Plain text math only. No LaTeX, no markdown.`;
+    const params = {
+      type: "object",
+      properties: {
+        questions: {
+          type: "array",
+          minItems: 4, maxItems: 10,
+          items: {
+            type: "object",
+            properties: {
+              question: { type: "string" },
+              marks: { type: "number" },
+              examinerExpects: { type: "string" },
+              modelAnswer: { type: "string" },
+              timeTip: { type: "string" },
+              source: { type: "string" },
+            },
+            required: ["question", "marks", "examinerExpects", "modelAnswer"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["questions"],
+      additionalProperties: false,
+    };
+    const parsed = await callAI({
+      systemPrompt,
+      userPrompt: `Exam Corner for Grade ${data.grade} – ${data.chapterTitle}.`,
+      toolName: "return_exam",
+      parameters: params,
+      model: MODEL_REASONING,
+    });
+    const validated = z.object({ questions: z.array(ExamQuestionSchema).min(1) }).parse(parsed);
+    return { questions: validated.questions };
+  });
