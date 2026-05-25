@@ -169,7 +169,7 @@ export function ConceptCards({
             <p className="text-muted-foreground text-[10px] font-bold tracking-[0.18em] uppercase">
               Learn first · revise smart
             </p>
-            <p className="font-extrabold">Concept cards &amp; formula sheet</p>
+            <p className="font-extrabold">Learning pathway, cards, formulas, solved examples &amp; exam corner</p>
           </div>
         </div>
         {open ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
@@ -197,7 +197,15 @@ export function ConceptCards({
           </button>
 
           {/* Tabs */}
-          <div className="bg-secondary mb-4 inline-flex rounded-xl p-1">
+          <div className="bg-secondary mb-4 flex flex-wrap gap-1 rounded-xl p-1">
+            <button
+              onClick={() => setTab("pathway")}
+              className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                tab === "pathway" ? "bg-card text-foreground shadow" : "text-muted-foreground"
+              }`}
+            >
+              <Map className="h-3.5 w-3.5" /> Learning pathway
+            </button>
             <button
               onClick={() => setTab("cards")}
               className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
@@ -214,7 +222,35 @@ export function ConceptCards({
             >
               <Calculator className="h-3.5 w-3.5" /> Formula sheet
             </button>
+            <button
+              onClick={() => setTab("solved")}
+              className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                tab === "solved" ? "bg-card text-foreground shadow" : "text-muted-foreground"
+              }`}
+            >
+              <BookText className="h-3.5 w-3.5" /> Solved examples
+            </button>
+            <button
+              onClick={() => setTab("exam")}
+              className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                tab === "exam" ? "bg-card text-foreground shadow" : "text-muted-foreground"
+              }`}
+            >
+              <GraduationCap className="h-3.5 w-3.5" /> Exam corner
+            </button>
           </div>
+
+          {tab === "pathway" && (
+            <LearningPathway grade={grade} chapterId={chapterId} chapterTitle={chapterTitle} />
+          )}
+
+          {tab === "solved" && (
+            <SolvedExamples grade={grade} chapterId={chapterId} chapterTitle={chapterTitle} />
+          )}
+
+          {tab === "exam" && (
+            <ExamCorner grade={grade} chapterId={chapterId} chapterTitle={chapterTitle} />
+          )}
 
           {tab === "cards" && (
             <>
