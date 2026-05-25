@@ -73,3 +73,18 @@ export function suggestDifficulty(grade: number, chapterId: number): "easy" | "m
   if (p > 75) return "hard";
   return "mixed";
 }
+
+/**
+ * Coarse student-level signal for adapting tutor / lesson depth.
+ */
+export function suggestStudentLevel(
+  grade: number,
+  chapterId: number,
+): "beginner" | "developing" | "proficient" {
+  const m = getChapterMastery(grade, chapterId);
+  if (m.overall.total < 5) return "developing";
+  const p = pct(m.overall);
+  if (p < 45) return "beginner";
+  if (p > 78) return "proficient";
+  return "developing";
+}

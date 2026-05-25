@@ -1,7 +1,20 @@
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { BookOpen, ChevronDown, ChevronUp, Sparkles, Calculator, Zap, Layers, Download, FileDown } from "lucide-react";
+import {
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
+  Calculator,
+  Zap,
+  Layers,
+  Download,
+  FileDown,
+  Map,
+  BookText,
+  GraduationCap,
+} from "lucide-react";
 import {
   generateConceptCards,
   generateFormulaSheet,
@@ -13,9 +26,10 @@ import {
   downloadFormulaSheetPdf,
   downloadRevisionPackPdf,
 } from "@/lib/pdf/revisionPdf";
+import { LearningPathway, SolvedExamples, ExamCorner } from "@/components/chapter/DeepLearning";
 
-const CARDS_PREFIX = "hbk-concepts-v2:";
-const FORMULAS_PREFIX = "hbk-formulas-v1:";
+const CARDS_PREFIX = "hbk-concepts-v3:";
+const FORMULAS_PREFIX = "hbk-formulas-v2:";
 
 function readJSON<T>(key: string): T | undefined {
   if (typeof window === "undefined") return undefined;
@@ -28,7 +42,7 @@ function readJSON<T>(key: string): T | undefined {
   }
 }
 
-type Tab = "cards" | "formulas";
+type Tab = "pathway" | "cards" | "formulas" | "solved" | "exam";
 type Depth = "quick" | "deep";
 
 export function ConceptCards({
@@ -41,7 +55,7 @@ export function ConceptCards({
   chapterTitle: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<Tab>("cards");
+  const [tab, setTab] = useState<Tab>("pathway");
   const [depth, setDepth] = useState<Depth>("quick");
   const [packLoading, setPackLoading] = useState(false);
 
@@ -155,7 +169,7 @@ export function ConceptCards({
             <p className="text-muted-foreground text-[10px] font-bold tracking-[0.18em] uppercase">
               Learn first · revise smart
             </p>
-            <p className="font-extrabold">Concept cards &amp; formula sheet</p>
+            <p className="font-extrabold">Learning pathway, cards, formulas, solved examples &amp; exam corner</p>
           </div>
         </div>
         {open ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
@@ -183,7 +197,15 @@ export function ConceptCards({
           </button>
 
           {/* Tabs */}
-          <div className="bg-secondary mb-4 inline-flex rounded-xl p-1">
+          <div className="bg-secondary mb-4 flex flex-wrap gap-1 rounded-xl p-1">
+            <button
+              onClick={() => setTab("pathway")}
+              className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                tab === "pathway" ? "bg-card text-foreground shadow" : "text-muted-foreground"
+              }`}
+            >
+              <Map className="h-3.5 w-3.5" /> Learning pathway
+            </button>
             <button
               onClick={() => setTab("cards")}
               className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
@@ -200,7 +222,35 @@ export function ConceptCards({
             >
               <Calculator className="h-3.5 w-3.5" /> Formula sheet
             </button>
+            <button
+              onClick={() => setTab("solved")}
+              className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                tab === "solved" ? "bg-card text-foreground shadow" : "text-muted-foreground"
+              }`}
+            >
+              <BookText className="h-3.5 w-3.5" /> Solved examples
+            </button>
+            <button
+              onClick={() => setTab("exam")}
+              className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                tab === "exam" ? "bg-card text-foreground shadow" : "text-muted-foreground"
+              }`}
+            >
+              <GraduationCap className="h-3.5 w-3.5" /> Exam corner
+            </button>
           </div>
+
+          {tab === "pathway" && (
+            <LearningPathway grade={grade} chapterId={chapterId} chapterTitle={chapterTitle} />
+          )}
+
+          {tab === "solved" && (
+            <SolvedExamples grade={grade} chapterId={chapterId} chapterTitle={chapterTitle} />
+          )}
+
+          {tab === "exam" && (
+            <ExamCorner grade={grade} chapterId={chapterId} chapterTitle={chapterTitle} />
+          )}
 
           {tab === "cards" && (
             <>
@@ -268,6 +318,24 @@ export function ConceptCards({
                         <span className="font-bold">Watch out: </span>
                         {c.pitfall}
                       </p>
+                      {c.derivation && (
+                        <p className="bg-card mt-2 rounded-lg p-2 text-xs">
+                          <span className="font-extrabold">{grade >= 8 ? "Derivation" : "Why it works"}: </span>
+                          {c.derivation}
+                        </p>
+                      )}
+                      {c.prerequisites && (
+                        <p className="text-muted-foreground mt-2 text-xs">
+                          <span className="font-bold">Prerequisites: </span>
+                          {c.prerequisites}
+                        </p>
+                      )}
+                      {c.relatedTopics && (
+                        <p className="text-muted-foreground mt-1 text-xs">
+                          <span className="font-bold">Related: </span>
+                          {c.relatedTopics}
+                        </p>
+                      )}
                       {c.examTip && (
                         <p className="bg-primary/10 text-primary mt-2 flex items-start gap-1.5 rounded-lg p-2 text-xs font-semibold">
                           <Zap className="mt-0.5 h-3 w-3 flex-none" />
@@ -307,17 +375,44 @@ export function ConceptCards({
                 </p>
               )}
               {formulasQ.data && (
-                <div className="border-border overflow-hidden rounded-2xl border-2">
+                <div className="space-y-2">
                   {formulasQ.data.map((f, i) => (
-                    <div
-                      key={i}
-                      className="border-border grid grid-cols-1 gap-1 border-b p-3 last:border-b-0 sm:grid-cols-[1fr_1.2fr_1.5fr] sm:items-center sm:gap-3"
-                    >
-                      <p className="text-sm font-extrabold">{f.name}</p>
-                      <p className="bg-secondary rounded-lg px-3 py-1.5 font-mono text-sm">
-                        {f.formula}
-                      </p>
-                      <p className="text-muted-foreground text-xs">{f.whenToUse}</p>
+                    <div key={i} className="border-border bg-card rounded-2xl border-2 p-3">
+                      <div className="grid grid-cols-1 gap-1 sm:grid-cols-[1fr_1.2fr_1.5fr] sm:items-center sm:gap-3">
+                        <p className="text-sm font-extrabold">{f.name}</p>
+                        <p className="bg-secondary rounded-lg px-3 py-1.5 font-mono text-sm">
+                          {f.formula}
+                        </p>
+                        <p className="text-muted-foreground text-xs">{f.whenToUse}</p>
+                      </div>
+                      {(f.derivation || f.conditions || f.commonMistake || f.relatedFormula) && (
+                        <div className="mt-2 grid gap-1.5 text-xs sm:grid-cols-2">
+                          {f.derivation && (
+                            <p className="bg-secondary/40 rounded-lg p-2">
+                              <span className="font-extrabold">Derivation: </span>
+                              {f.derivation}
+                            </p>
+                          )}
+                          {f.conditions && (
+                            <p className="bg-secondary/40 rounded-lg p-2">
+                              <span className="font-extrabold">Valid when: </span>
+                              {f.conditions}
+                            </p>
+                          )}
+                          {f.commonMistake && (
+                            <p className="bg-amber-50 text-amber-900 rounded-lg p-2">
+                              <span className="font-extrabold">Watch out: </span>
+                              {f.commonMistake}
+                            </p>
+                          )}
+                          {f.relatedFormula && (
+                            <p className="text-muted-foreground rounded-lg p-2">
+                              <span className="font-extrabold">Related: </span>
+                              {f.relatedFormula}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
