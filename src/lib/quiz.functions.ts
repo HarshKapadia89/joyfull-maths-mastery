@@ -337,6 +337,9 @@ const ConceptCardSchema = z.object({
   example: z.string(),
   pitfall: z.string(),
   examTip: z.string().optional(),
+  derivation: z.string().optional(),
+  prerequisites: z.string().optional(),
+  relatedTopics: z.string().optional(),
 });
 export type ConceptCard = z.infer<typeof ConceptCardSchema>;
 
