@@ -423,6 +423,10 @@ const FormulaSchema = z.object({
   name: z.string(),
   formula: z.string(),
   whenToUse: z.string(),
+  derivation: z.string().optional(),
+  conditions: z.string().optional(),
+  commonMistake: z.string().optional(),
+  relatedFormula: z.string().optional(),
 });
 export type Formula = z.infer<typeof FormulaSchema>;
 
@@ -436,16 +440,20 @@ export const generateFormulaSheet = createServerFn({ method: "POST" })
       .parse(data),
   )
   .handler(async ({ data }) => {
-    const systemPrompt = `You are an NCERT Grade ${data.grade} Maths teacher. List every important formula, rule, identity, or property a student needs from the chapter "${data.chapterTitle}".
+    const systemPrompt = `You are a top NCERT Grade ${data.grade} Maths teacher. List every important formula, rule, identity, or property a student needs from the chapter "${data.chapterTitle}", with tuition-class-grade depth.
 
 Rules:
 - Plain text math only ("a^2 + b^2 = c^2", "π", "√2", "x/y"). No LaTeX, no markdown.
-- "name" is a short label (e.g. "Area of triangle").
-- "formula" is the formula itself.
-- "whenToUse" is a 1-line description of when to use it.
+- "name" — short label (e.g. "Area of triangle").
+- "formula" — the formula itself.
+- "whenToUse" — 1-line description of when to use it.
+- "derivation" (optional) — 1–3 line derivation or "why it works"; for Grades 8–10 give a proper short proof, for Grades 1–7 give visual intuition. Omit if trivial.
+- "conditions" (optional) — when the formula is valid / not valid (e.g. "a > 0", "x ≠ 0").
+- "commonMistake" (optional) — 1-line mistake students typically make.
+- "relatedFormula" (optional) — name of a closely related formula.
 - Return 4–10 entries, ordered from most fundamental to most advanced.
-- If the chapter has very few formulas (e.g. a definitions-heavy chapter), include key properties / rules instead.`;
-    const userPrompt = `Formula sheet for Grade ${data.grade} – ${data.chapterTitle}.`;
+- If the chapter has very few formulas (definitions-heavy), include key properties / rules instead.`;
+    const userPrompt = `Tuition-class formula sheet for Grade ${data.grade} – ${data.chapterTitle}.`;
     const schema = z.object({ formulas: z.array(FormulaSchema).min(1).max(15) });
     const params = {
       type: "object",
@@ -460,6 +468,10 @@ Rules:
               name: { type: "string" },
               formula: { type: "string" },
               whenToUse: { type: "string" },
+              derivation: { type: "string" },
+              conditions: { type: "string" },
+              commonMistake: { type: "string" },
+              relatedFormula: { type: "string" },
             },
             required: ["name", "formula", "whenToUse"],
             additionalProperties: false,
