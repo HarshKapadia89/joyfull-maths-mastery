@@ -357,7 +357,7 @@ export const generateConceptCards = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const depth = data.depth ?? "quick";
     const target = depth === "deep" ? 8 : 4;
-    const systemPrompt = `You are an NCERT Grade ${data.grade} Maths teacher. Create exactly ${target} concise "concept cards" that recap the chapter "${data.chapterTitle}" so a student can revise${depth === "deep" ? " thoroughly" : " in 1 minute"} before practice.
+    const systemPrompt = `You are a top-tier NCERT Grade ${data.grade} Maths teacher (tuition-class quality). Create exactly ${target} concise "concept cards" that recap the chapter "${data.chapterTitle}" so a student can revise${depth === "deep" ? " thoroughly" : " in 1 minute"} before practice.
 
 Cover a VARIETY of angles across the cards: definition, key formula or rule, a fully worked example, a common mistake / pitfall, an exam tip, and any sub-topic the NCERT chapter is famous for.
 
@@ -366,8 +366,39 @@ Rules:
 - Each field: 1–2 short sentences, age-appropriate for Grade ${data.grade}.
 - "title" is a short topic label (3–5 words).
 - "examTip" is a 1-line exam-day tip.
+- "derivation" (optional) — for Grades 8–10, include a brief proof / derivation in 1–3 lines when the card has a formula or theorem. For Grades 1–7, use a "Why it works" visual/intuition line instead. Omit if not applicable.
+- "prerequisites" (optional) — 1 line naming the earlier concept the student should already know.
+- "relatedTopics" (optional) — 1 line listing related topics in this or earlier chapters.
 - You MUST return ${target} cards in the "cards" array.`;
-    const userPrompt = `Make ${target} varied concept cards for Grade ${data.grade} – ${data.chapterTitle}.`;
+    const userPrompt = `Make ${target} varied, tuition-class-depth concept cards for Grade ${data.grade} – ${data.chapterTitle}.`;
+    const schema = z.object({ cards: z.array(ConceptCardSchema).min(1).max(10) });
+    const params = {
+      type: "object",
+      properties: {
+        cards: {
+          type: "array",
+          minItems: Math.max(2, target - 2),
+          maxItems: target + 2,
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              keyIdea: { type: "string" },
+              example: { type: "string" },
+              pitfall: { type: "string" },
+              examTip: { type: "string" },
+              derivation: { type: "string" },
+              prerequisites: { type: "string" },
+              relatedTopics: { type: "string" },
+            },
+            required: ["title", "keyIdea", "example", "pitfall", "examTip"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["cards"],
+      additionalProperties: false,
+    };
     const schema = z.object({ cards: z.array(ConceptCardSchema).min(1).max(10) });
     const params = {
       type: "object",
