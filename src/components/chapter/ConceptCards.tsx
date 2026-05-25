@@ -55,7 +55,7 @@ export function ConceptCards({
   chapterTitle: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<Tab>("cards");
+  const [tab, setTab] = useState<Tab>("pathway");
   const [depth, setDepth] = useState<Depth>("quick");
   const [packLoading, setPackLoading] = useState(false);
 
