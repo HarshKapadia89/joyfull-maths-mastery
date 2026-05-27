@@ -107,7 +107,7 @@ export type Database = {
     }
     Functions: {
       increment_usage: {
-        Args: { _feature: string; _limit: number }
+        Args: { _feature: string; _limit: number; _user_id: string }
         Returns: Json
       }
     }
