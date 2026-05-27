@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   type StripeEnv,
@@ -10,8 +9,6 @@ import {
 type CheckoutResult = { clientSecret: string } | { error: string };
 type PortalResult = { url: string } | { error: string };
 type ChangeResult = { success: true } | { error: string };
-
-const admin = () => supabaseAdmin;
 
 async function resolveCustomer(
   stripe: ReturnType<typeof createStripeClient>,
