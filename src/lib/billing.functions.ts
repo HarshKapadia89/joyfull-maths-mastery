@@ -115,7 +115,7 @@ export const changeSubscriptionPlan = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<ChangeResult> => {
     try {
       const { userId } = context;
-      const { data: sub } = await admin()
+      const { data: sub } = await context.supabase
         .from("subscriptions")
         .select("stripe_subscription_id, price_id")
         .eq("user_id", userId)
@@ -154,7 +154,7 @@ export const cancelSubscription = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<ChangeResult> => {
     try {
       const { userId } = context;
-      const { data: sub } = await admin()
+      const { data: sub } = await context.supabase
         .from("subscriptions")
         .select("stripe_subscription_id")
         .eq("user_id", userId)
