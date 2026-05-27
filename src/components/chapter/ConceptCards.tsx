@@ -10,22 +10,47 @@ import {
   Zap,
   Layers,
   Download,
-  FileDown,
   Map,
   BookText,
   GraduationCap,
+  Zap as Lightning,
+  BookMarked,
 } from "lucide-react";
+
 import {
   generateConceptCards,
   generateFormulaSheet,
+  generateChapterPathway,
+  generateTopicLesson,
+  generateSolvedExamples,
+  generateExamCorner,
   type ConceptCard,
   type Formula,
+  type PathwayTopic,
+  type TopicLesson,
+  type SolvedExample,
+  type ExamQuestion,
 } from "@/lib/quiz.functions";
 import {
   downloadConceptCardsPdf,
   downloadFormulaSheetPdf,
   downloadRevisionPackPdf,
+  downloadQuickRevisionPackPdf,
+  downloadLearningPathwayPdf,
+  downloadSolvedExamplesPdf,
+  downloadExamCornerPdf,
 } from "@/lib/pdf/revisionPdf";
+import {
+  ensurePathway,
+  ensureSolved,
+  ensureExam,
+  ensureAllTopicLessons,
+  readJSON as readDLJSON,
+  pathwayKey,
+  lessonKey,
+  solvedKey,
+  examKey,
+} from "@/lib/deep-learning-cache";
 import { LearningPathway, SolvedExamples, ExamCorner } from "@/components/chapter/DeepLearning";
 
 const CARDS_PREFIX = "hbk-concepts-v3:";
@@ -44,6 +69,7 @@ function readJSON<T>(key: string): T | undefined {
 
 type Tab = "pathway" | "cards" | "formulas" | "solved" | "exam";
 type Depth = "quick" | "deep";
+type PackKind = "quick" | "full" | null;
 
 export function ConceptCards({
   grade,
@@ -57,11 +83,16 @@ export function ConceptCards({
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("pathway");
   const [depth, setDepth] = useState<Depth>("quick");
-  const [packLoading, setPackLoading] = useState(false);
+  const [packBusy, setPackBusy] = useState<PackKind>(null);
+  const [packStatus, setPackStatus] = useState<string>("");
 
   const genCards = useServerFn(generateConceptCards);
   const genFormulas = useServerFn(generateFormulaSheet);
-  const queryClient = useQueryClient();
+  const genPathway = useServerFn(generateChapterPathway);
+  const genLesson = useServerFn(generateTopicLesson);
+  const genSolved = useServerFn(generateSolvedExamples);
+  const genExam = useServerFn(generateExamCorner);
+  const qc = useQueryClient();
 
   const cardsKey = `${CARDS_PREFIX}${grade}-${chapterId}-${depth}`;
   const formulasKey = `${FORMULAS_PREFIX}${grade}-${chapterId}`;
@@ -98,7 +129,7 @@ export function ConceptCards({
     const key = `${CARDS_PREFIX}${grade}-${chapterId}-${d}`;
     const cached = readJSON<ConceptCard[]>(key);
     if (cached) return cached;
-    const res = await queryClient.fetchQuery({
+    const res = await qc.fetchQuery({
       queryKey: ["concepts", grade, chapterId, d],
       queryFn: async () => {
         const r = await genCards({ data: { grade, chapterTitle, depth: d } });
@@ -112,7 +143,7 @@ export function ConceptCards({
   async function ensureFormulas(): Promise<Formula[]> {
     const cached = readJSON<Formula[]>(formulasKey);
     if (cached) return cached;
-    const res = await queryClient.fetchQuery({
+    const res = await qc.fetchQuery({
       queryKey: ["formulas", grade, chapterId],
       queryFn: async () => {
         const r = await genFormulas({ data: { grade, chapterTitle } });
@@ -123,17 +154,102 @@ export function ConceptCards({
     return res;
   }
 
-  async function handleDownloadPack() {
-    setPackLoading(true);
+  async function safe<T>(label: string, fn: () => Promise<T>): Promise<T | null> {
     try {
-      // Always pull the deep set for the printable pack
-      const [cards, formulas] = await Promise.all([ensureCards("deep"), ensureFormulas()]);
-      downloadRevisionPackPdf({ grade, chapterTitle, cards, formulas });
+      setPackStatus(label);
+      return await fn();
+    } catch (e) {
+      console.error(`${label} failed`, e);
+      return null;
+    }
+  }
+
+  async function handleQuickPack() {
+    setPackBusy("quick");
+    try {
+      setPackStatus("Concept cards…");
+      const cards = await ensureCards("deep");
+      setPackStatus("Formula sheet…");
+      const formulas = await ensureFormulas();
+      const pathway = await safe("Pathway at a glance…", () =>
+        ensurePathway(qc, genPathway, grade, chapterId, chapterTitle),
+      );
+      const examCorner = await safe(
+        grade <= 7 ? "Test highlights…" : "Exam highlights…",
+        () => ensureExam(qc, genExam, grade, chapterId, chapterTitle),
+      );
+      setPackStatus("Building PDF…");
+      downloadQuickRevisionPackPdf({
+        grade,
+        chapterTitle,
+        cards,
+        formulas,
+        pathway: pathway ?? undefined,
+        examCorner: examCorner ?? undefined,
+      });
     } catch (e) {
       console.error(e);
-      alert("Couldn't build the revision pack. Please try again.");
+      alert("Couldn't build the Quick Pack. Please try again.");
     } finally {
-      setPackLoading(false);
+      setPackBusy(null);
+      setPackStatus("");
+    }
+  }
+
+  async function handleFullPack() {
+    setPackBusy("full");
+    try {
+      setPackStatus("Concept cards…");
+      const cards = await ensureCards("deep");
+      setPackStatus("Formula sheet…");
+      const formulas = await ensureFormulas();
+
+      const pathway = await safe("Learning pathway index…", () =>
+        ensurePathway(qc, genPathway, grade, chapterId, chapterTitle),
+      );
+
+      let topicLessons: Array<{ topic: PathwayTopic; lesson: TopicLesson | null }> = [];
+      if (pathway && pathway.length) {
+        topicLessons = await ensureAllTopicLessons(
+          qc,
+          genLesson,
+          grade,
+          chapterId,
+          chapterTitle,
+          pathway,
+          {
+            concurrency: 3,
+            onProgress: (done, total) =>
+              setPackStatus(`Topic mini-lessons… ${done}/${total}`),
+          },
+        );
+      }
+
+      const solvedExamples = await safe("Solved examples…", () =>
+        ensureSolved(qc, genSolved, grade, chapterId, chapterTitle),
+      );
+      const examCorner = await safe(
+        grade <= 7 ? "Test & Olympiad corner…" : "Exam corner…",
+        () => ensureExam(qc, genExam, grade, chapterId, chapterTitle),
+      );
+
+      setPackStatus("Building PDF…");
+      downloadRevisionPackPdf({
+        grade,
+        chapterTitle,
+        cards,
+        formulas,
+        pathway: pathway ?? undefined,
+        topicLessons: topicLessons.length ? topicLessons : undefined,
+        solvedExamples: solvedExamples ?? undefined,
+        examCorner: examCorner ?? undefined,
+      });
+    } catch (e) {
+      console.error(e);
+      alert("Couldn't build the Full Pack. Please try again.");
+    } finally {
+      setPackBusy(null);
+      setPackStatus("");
     }
   }
 
@@ -154,6 +270,58 @@ export function ConceptCards({
       console.error(e);
     }
   }
+
+  async function handleDownloadPathwayPdf() {
+    try {
+      setPackBusy("full");
+      setPackStatus("Learning pathway…");
+      const pathway = await ensurePathway(qc, genPathway, grade, chapterId, chapterTitle);
+      const topicLessons = await ensureAllTopicLessons(
+        qc,
+        genLesson,
+        grade,
+        chapterId,
+        chapterTitle,
+        pathway,
+        {
+          concurrency: 3,
+          onProgress: (done, total) => setPackStatus(`Topic lessons… ${done}/${total}`),
+        },
+      );
+      downloadLearningPathwayPdf({ grade, chapterTitle, pathway, topicLessons });
+    } catch (e) {
+      console.error(e);
+      alert("Couldn't build the Learning Pathway PDF.");
+    } finally {
+      setPackBusy(null);
+      setPackStatus("");
+    }
+  }
+
+  async function handleDownloadSolvedPdf() {
+    try {
+      const examples = await ensureSolved(qc, genSolved, grade, chapterId, chapterTitle);
+      downloadSolvedExamplesPdf({ grade, chapterTitle, examples });
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function handleDownloadExamPdf() {
+    try {
+      const questions = await ensureExam(qc, genExam, grade, chapterId, chapterTitle);
+      downloadExamCornerPdf({ grade, chapterTitle, questions });
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  // Surface cached availability for per-tab buttons
+  const pathwayCached = !!readDLJSON<PathwayTopic[]>(pathwayKey(grade, chapterId));
+  const solvedCached = !!readDLJSON<SolvedExample[]>(solvedKey(grade, chapterId));
+  const examCached = !!readDLJSON<ExamQuestion[]>(examKey(grade, chapterId));
+  // silence unused import in case lessonKey isn't used elsewhere
+  void lessonKey;
 
   return (
     <div className="bg-card shadow-card mb-4 rounded-3xl">
@@ -177,24 +345,53 @@ export function ConceptCards({
 
       {open && (
         <div className="px-5 pb-5">
-          {/* Primary PDF action */}
-          <button
-            onClick={handleDownloadPack}
-            disabled={packLoading}
-            className="bg-primary text-primary-foreground hover:bg-primary/90 mb-4 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 font-bold disabled:opacity-60"
-          >
-            {packLoading ? (
-              <>
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                Building HBK Revision Pack…
-              </>
-            ) : (
-              <>
-                <FileDown className="h-4 w-4" />
-                Download HBK Revision Pack (PDF)
-              </>
-            )}
-          </button>
+          {/* Two PDF download options */}
+          <div className="mb-4 grid gap-2 sm:grid-cols-2">
+            <button
+              onClick={handleQuickPack}
+              disabled={packBusy !== null}
+              className="border-primary text-primary hover:bg-primary/5 inline-flex items-center justify-center gap-2 rounded-xl border-2 px-4 py-3 text-left font-bold disabled:opacity-60"
+            >
+              {packBusy === "quick" ? (
+                <>
+                  <div className="border-primary h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
+                  <span className="text-xs">{packStatus || "Building Quick Pack…"}</span>
+                </>
+              ) : (
+                <>
+                  <Lightning className="h-4 w-4 flex-none" />
+                  <span className="flex-1">
+                    <span className="block text-sm">Quick Pack (PDF)</span>
+                    <span className="block text-[10px] font-semibold opacity-70">
+                      Cards + formulas + 1-page summary
+                    </span>
+                  </span>
+                </>
+              )}
+            </button>
+            <button
+              onClick={handleFullPack}
+              disabled={packBusy !== null}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-left font-bold disabled:opacity-60"
+            >
+              {packBusy === "full" ? (
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  <span className="text-xs">{packStatus || "Building Full Pack…"}</span>
+                </>
+              ) : (
+                <>
+                  <BookMarked className="h-4 w-4 flex-none" />
+                  <span className="flex-1">
+                    <span className="block text-sm">Full Pack (PDF)</span>
+                    <span className="block text-[10px] font-semibold opacity-80">
+                      Pathway · solved examples · exam corner
+                    </span>
+                  </span>
+                </>
+              )}
+            </button>
+          </div>
 
           {/* Tabs */}
           <div className="bg-secondary mb-4 flex flex-wrap gap-1 rounded-xl p-1">
@@ -241,15 +438,54 @@ export function ConceptCards({
           </div>
 
           {tab === "pathway" && (
-            <LearningPathway grade={grade} chapterId={chapterId} chapterTitle={chapterTitle} />
+            <>
+              <div className="mb-2 flex justify-end">
+                <button
+                  onClick={handleDownloadPathwayPdf}
+                  disabled={packBusy !== null}
+                  className="text-primary inline-flex items-center gap-1 text-xs font-bold disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {packBusy === "full" && packStatus
+                    ? packStatus
+                    : pathwayCached
+                      ? "Pathway PDF"
+                      : "Build & download Pathway PDF"}
+                </button>
+              </div>
+              <LearningPathway grade={grade} chapterId={chapterId} chapterTitle={chapterTitle} />
+            </>
           )}
 
           {tab === "solved" && (
-            <SolvedExamples grade={grade} chapterId={chapterId} chapterTitle={chapterTitle} />
+            <>
+              <div className="mb-2 flex justify-end">
+                <button
+                  onClick={handleDownloadSolvedPdf}
+                  disabled={!solvedCached && packBusy !== null}
+                  className="text-primary inline-flex items-center gap-1 text-xs font-bold disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5" /> Solved Examples PDF
+                </button>
+              </div>
+              <SolvedExamples grade={grade} chapterId={chapterId} chapterTitle={chapterTitle} />
+            </>
           )}
 
           {tab === "exam" && (
-            <ExamCorner grade={grade} chapterId={chapterId} chapterTitle={chapterTitle} />
+            <>
+              <div className="mb-2 flex justify-end">
+                <button
+                  onClick={handleDownloadExamPdf}
+                  disabled={!examCached && packBusy !== null}
+                  className="text-primary inline-flex items-center gap-1 text-xs font-bold disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {grade <= 7 ? "Test & Olympiad PDF" : "Exam Corner PDF"}
+                </button>
+              </div>
+              <ExamCorner grade={grade} chapterId={chapterId} chapterTitle={chapterTitle} />
+            </>
           )}
 
           {tab === "cards" && (
@@ -419,6 +655,8 @@ export function ConceptCards({
               )}
             </>
           )}
+
+
         </div>
       )}
     </div>
