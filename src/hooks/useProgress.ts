@@ -68,6 +68,7 @@ function loadProgress(): ProgressState {
 function saveProgress(p: ProgressState) {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+  window.dispatchEvent(new CustomEvent("hbk-progress-changed"));
 }
 
 export function loadMistakes(): StoredMistake[] {

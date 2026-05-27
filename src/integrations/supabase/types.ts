@@ -14,7 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          chapters: Json
+          concept_stars: number
+          created_at: string
+          full_name: string | null
+          grade: number | null
+          id: string
+          last_active_date: string | null
+          onboarded: boolean
+          phone: string | null
+          problem_stars: number
+          streak: number
+          subscription_expires_at: string | null
+          subscription_tier: string
+          updated_at: string
+          xp: number
+        }
+        Insert: {
+          chapters?: Json
+          concept_stars?: number
+          created_at?: string
+          full_name?: string | null
+          grade?: number | null
+          id: string
+          last_active_date?: string | null
+          onboarded?: boolean
+          phone?: string | null
+          problem_stars?: number
+          streak?: number
+          subscription_expires_at?: string | null
+          subscription_tier?: string
+          updated_at?: string
+          xp?: number
+        }
+        Update: {
+          chapters?: Json
+          concept_stars?: number
+          created_at?: string
+          full_name?: string | null
+          grade?: number | null
+          id?: string
+          last_active_date?: string | null
+          onboarded?: boolean
+          phone?: string | null
+          problem_stars?: number
+          streak?: number
+          subscription_expires_at?: string | null
+          subscription_tier?: string
+          updated_at?: string
+          xp?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

@@ -113,14 +113,37 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 import { SiteHeader } from "../components/SiteHeader";
+import { GuestBanner } from "../components/auth/GuestBanner";
+import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+
+import { supabase } from "../integrations/supabase/client";
+import { Toaster } from "../components/ui/sonner";
+
+function AuthListener() {
+  const router = useRouter();
+  const qc = useQueryClient();
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      qc.invalidateQueries();
+      router.invalidate();
+    });
+    return () => subscription.unsubscribe();
+  }, [router, qc]);
+  return null;
+}
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
     <QueryClientProvider client={queryClient}>
+      <AuthListener />
       <SiteHeader />
+      <GuestBanner />
       <Outlet />
+      <Toaster />
     </QueryClientProvider>
   );
 }
+

@@ -1,128 +1,105 @@
-# Goal
+# Plan: Authentication, Profiles, Cloud Progress
 
-Offer **two downloadable PDFs** from every chapter, across all grades (1–10) and all chapters:
-
-1. **Quick Revision Pack** — short gist, fast to print, fits in a school bag. Concept Cards + Formula Sheet + a one-page summary of the Learning Pathway + the most-asked Exam Corner highlights. Roughly 6–12 pages.
-2. **Full Revision Pack** — the complete tuition handout. Concept Cards + Formula Sheet + full topic-by-topic Learning Pathway lessons + all Solved Examples + full Exam Corner. Roughly 30–60 pages depending on chapter density.
-
-Both are additive. The existing Concept Cards and Formula Sheet PDFs (already downloadable separately) stay exactly as they are.
+Based on your answers: **Google OAuth only**, **max-merge** local→cloud on first login, **dedicated marketing landing**, **hybrid gating** (guests can browse + practice; Pro/Plus features locked behind login + paid tier).
 
 ---
 
-## 1. UI on the chapter page
+## 1. Database — single migration
 
-Inside `ConceptCards.tsx`, replace the single "Download Revision Pack" button with a small **download menu** (dropdown or two adjacent buttons):
+Create `profiles` table (1:1 with `auth.users`) with the columns you listed plus the existing `chapters` JSONB blob so chapter-level stars/attempts also sync.
 
-- **Quick Pack (PDF)** — secondary button, lightning icon. Subtitle: "Cards + formulas + one-page summary".
-- **Full Pack (PDF)** — primary button, book icon. Subtitle: "Everything: pathway, solved examples, exam corner".
+Columns: `id` (PK + FK→auth.users, ON DELETE CASCADE), `full_name`, `grade` (1–10, CHECK), `phone`, `subscription_tier` (default `'free'`, CHECK in free/plus/pro/family), `subscription_expires_at`, `xp` (default 0), `streak` (default 0), `last_active_date`, `problem_stars` (default 0), `concept_stars` (default 0), `chapters` (JSONB, default `'{}'`), `onboarded` (bool, default false), `created_at`, `updated_at`.
 
-The existing per-tab "Download this section" links stay for power users who want just one section.
+- GRANT SELECT/INSERT/UPDATE on `public.profiles` to `authenticated`; GRANT ALL to `service_role`. No anon grant.
+- RLS: users can SELECT/INSERT/UPDATE only their own row (`auth.uid() = id`). No DELETE policy (account deletion handled by cascade).
+- Trigger `on_auth_user_created` → auto-insert empty profile row on signup (security definer function `handle_new_user`).
+- Trigger `update_profiles_updated_at` for `updated_at`.
 
-## 2. Quick Revision Pack — what's inside
+## 2. Auth provider setup
 
-Designed to be the "exam-eve cheat sheet". Compact, dense, high signal.
+- Enable Google via `configure_social_auth(["google"])`.
+- Disable email signup explicitly (`disable_signup: false` kept on, but UI only shows Google). Auto-confirm stays off.
+- No phone provider work this round.
 
-```text
-Cover  ▸  01 Concept Cards (compact 2-column, today's style)
-       ▸  02 Formula Sheet (today's style)
-       ▸  03 Pathway at a Glance     ← NEW, single page
-       ▸  04 Exam Highlights          ← NEW, 1–2 pages
-```
+## 3. Routes (file-based)
 
-- **Pathway at a Glance** (1 page) — numbered list of all topics in the chapter, each with a one-line "what you'll learn" caption. No derivations, no worked examples. Acts as a study checklist.
-- **Exam Highlights** (1–2 pages) — top 4–6 PYQ / Board-pattern questions (Grades 9–10) or top tricky test questions (Grades 1–7), each as a tight card with the question, marks badge, and a 2–3 line "Examiner expects" cue. No full model answers in Quick Pack — keeps it short and forces active recall.
+**New / changed:**
+- `src/routes/index.tsx` → **marketing landing** for guests (hero, "Why HBK", grade tiles teaser, Pricing teaser, "Continue with Google" CTA). For signed-in users, immediately redirect to `/dashboard`.
+- `src/routes/dashboard.tsx` → the current home content (HeroBanner / StatTiles / POTD / ModeCards / Grade tiles), now powered by cloud profile.
+- `src/routes/login.tsx` → minimal page with Google button + redirect-back via `?redirect=`.
+- `src/routes/onboarding.tsx` → 2-question form (name + grade dropdown 1–10). Gated: requires auth, blocks `/dashboard` until `onboarded = true`.
+- `src/routes/pricing.tsx` → public; shows Free/Plus/Pro/Family tiers (read-only teaser, no checkout yet).
 
-Routing: Quick Pack only needs the pathway *index* (already returned by `generateChapterPathway`) and the Exam Corner payload — **no per-topic lesson fetches**, so it's near-instant when Concept Cards + Formula Sheet are already cached.
+**Auth flow:**
+- `src/routes/__root.tsx` mounts a `<AuthProvider>` + single `onAuthStateChange` listener that invalidates the router + query cache.
+- Use TanStack's `_authenticated` pathless layout pattern is **not** applied globally (because gating is hybrid). Instead, individual protected routes (`/dashboard`, `/onboarding`, `/progress`, `/parent`) use `beforeLoad` to check session and redirect to `/login`.
 
-## 3. Full Revision Pack — what's inside
+## 4. Hybrid gating
 
-```text
-Cover  ▸  01 Concept Cards
-       ▸  02 Formula Sheet
-       ▸  03 Learning Pathway      ← full mini-lessons, one topic per page(s)
-       ▸  04 Solved Examples       ← all 6–10 worked problems
-       ▸  05 Exam Corner           ← all questions + model answers + tips
-                                   (renamed "Test & Olympiad Corner" for Grades 1–7)
-```
+- **Open to guests**: `/`, `/pricing`, `/grade/$gradeId`, `/grade/$gradeId/chapter/$chapterId` (quiz playable), `/tutor` (limited), `/revise`, `/worksheet`, `/flashcards/*`, `/daily`.
+- **Login required (free OK)**: `/dashboard`, `/onboarding`, `/progress`, `/parent`, `/mock`.
+- **Login + paid tier required**: Full Revision Pack PDF download, photo Mathy, future adaptive plan. Implemented via a single `useEntitlements()` hook returning `{ canDownloadFullPack, canUsePhotoSolver, canUseAdaptive }` based on `subscription_tier`. UI shows a "Pro" lock badge + upsell modal for guests/free users.
 
-Each new section gets the same premium treatment as today's two: dedicated section divider page (oversized numeral), watermark, headers, footers, pack ID, A4 layout, indigo→violet→gold palette.
+Guest banner: small dismissible bar on quiz result screens and on free-tier-only pages — "Sign in with Google to save your XP and streak across devices."
 
-### Learning Pathway rendering (Full Pack only)
+## 5. Top navbar
 
-- Roadmap overview page (numbered vertical list with gold connector).
-- Then one mini-lesson per topic: Prerequisites · Intuition · Definition · Derivation/Why (becomes "Visual idea" for Grades 1–7) · 2–3 Worked Examples (Given/Method/Steps/Boxed answer) · Common Mistakes · Practice Check (answers in light grey below) · "What's next →".
+Replace `SiteHeader.tsx`:
+- **Signed in**: logo · existing nav · `<UserChip>` showing `Name · G{grade}` · `⚡{xp}` · `🔥{streak}` · tier badge (Free/Plus/Pro/Family with color) · avatar dropdown (Profile, Logout).
+- **Guest**: logo · existing nav · "Sign in" button (Google icon).
+- All counters read from `useProfile()` for signed-in users, `useProgress()` (localStorage) for guests, so the chrome works either way.
 
-### Solved Examples rendering (Full Pack only)
+## 6. Cloud progress sync (`useCloudProgress`)
 
-- Grouped Easy / Medium / Hard. Each card: Given · To find · Method (with rationale) · Step-by-step · Alternate method when present · Boxed final answer.
+New hook layered on top of `useProgress`:
+- On mount, if `session` exists, fetch profile via server fn `getMyProfile()`.
+- One-time **max-merge** when local data exists and cloud `xp === 0` (or a `migrated_at` flag is null): `xp = max(local, cloud)`, same for `streak`, `problem_stars`, `concept_stars`; chapters JSONB merged per-key with max of `best`/`stars`/`attempts`. Persists via server fn `mergeLocalProgress(payload)`. Then sets `localStorage.hbk-migrated = true` so it never re-runs.
+- After merge, all writes go to **both** localStorage (for offline + guest fallback) AND a debounced server fn `updateProgress(patch)`.
+- `last_active_date` and streak recomputed server-side (security-definer fn `bump_streak()`).
 
-### Exam Corner rendering (Full Pack only)
+Server functions (all in `src/lib/profile.functions.ts`, all using `requireSupabaseAuth`):
+- `getMyProfile()` → row from `profiles`.
+- `updateProfile(patch)` → name/grade/onboarded edits.
+- `mergeLocalProgress(payload)` → idempotent max-merge.
+- `updateProgress(patch)` → debounced incremental writes.
 
-- Question card with marks badge · "Examiner expects" callout · full model answer · time tip · source tag (CBSE PYQ / Exemplar / Board pattern). Grades 1–7 use difficulty badges + Olympiad-style hint where present. Section ends with "Most-asked sub-topics".
+## 7. Onboarding flow
 
-## 4. Data flow & caching
+After Google sign-in: `onAuthStateChange` listener checks `profile.onboarded`. If false → router redirect to `/onboarding`. Form posts to `updateProfile({ full_name, grade, onboarded: true })`. Then redirects to `?redirect=` URL or `/dashboard`.
 
-Both packs read from the **same localStorage cache** the in-app tabs already write to:
+## 8. Files (additive + edits)
 
-- `pathway:{grade}:{chapter}` — pathway index (used by both packs)
-- `pathway-lesson:{grade}:{chapter}:{topic}` — per-topic lesson (Full Pack only)
-- `solved:{grade}:{chapter}` — solved examples (Full Pack only)
-- `exam:{grade}:{chapter}` — exam corner (both packs)
+**New**
+- `src/lib/profile.functions.ts` — server fns above
+- `src/hooks/useProfile.ts` — TanStack Query wrapper around `getMyProfile`
+- `src/hooks/useCloudProgress.ts` — merge + sync layer
+- `src/hooks/useEntitlements.ts` — tier-based feature flags
+- `src/components/auth/UserChip.tsx`, `SignInButton.tsx`, `GuestBanner.tsx`, `UpgradeLockBadge.tsx`
+- `src/routes/login.tsx`, `src/routes/onboarding.tsx`, `src/routes/dashboard.tsx`, `src/routes/pricing.tsx`
+- `src/components/landing/*` — marketing landing sections
 
-Pack assembly logic:
+**Edited**
+- `src/routes/index.tsx` — becomes marketing landing
+- `src/routes/__root.tsx` — wire `onAuthStateChange` listener
+- `src/components/SiteHeader.tsx` — auth-aware navbar
+- `src/components/chapter/ConceptCards.tsx` — Full Pack download gated via `useEntitlements`
+- `src/start.ts` — verify `attachSupabaseAuth` is registered (likely already is)
 
-1. Check localStorage for every payload the pack needs.
-2. Anything missing is fetched live with a progress toast: "Building your Full Pack… (2/4 Pathway lessons, topic 3 of 7)".
-3. Per-topic lessons fetch in parallel, capped at 3 concurrent calls.
-4. If a section fails after retry, the PDF still generates with the rest and a small "Section unavailable — please retry" placeholder. The user never loses the other sections.
+**Not touched**: existing quiz, PDF generation logic, chapter pages, `useProgress` (it remains for guest/offline; the new hook composes on top).
 
-Quick Pack will almost always finish in seconds. Full Pack on a cold cache for a dense Grade 10 chapter can take ~20–40s — the progress toast makes that wait understandable.
+## 9. Out of scope (flagged for later)
 
-## 5. Grade calibration
-
-Handled upstream in the AI prompts (already in place). The PDF renderer only:
-
-- Renames Exam Corner heading to **"Test & Olympiad Corner"** when `grade <= 7`.
-- Renames the Derivation block to **"Visual idea"** when `grade <= 7`.
-
-## 6. Standalone per-section PDFs
-
-In addition to Quick / Full packs, keep the existing standalone downloads (`downloadConceptCardsPdf`, `downloadFormulaSheetPdf`) and add two thin helpers used by the new tabs:
-
-- `downloadLearningPathwayPdf` — cover + roadmap + all topic lessons.
-- `downloadExamCornerPdf` — cover + Exam Corner section only.
-
-So a student can print just one section without building either pack.
+- Payments / checkout (Pricing page is teaser only; Stripe or Paddle wiring is a follow-up).
+- Phone OTP login (you chose Google-only for now).
+- Family plan member management.
+- Account deletion UI (cascade works at DB level).
 
 ---
 
-## Technical details
+## Approval checkpoints during build
 
-**Files touched**
+Two pauses where I'll need your input:
+1. After I write the migration — you approve before it runs.
+2. After Google provider is enabled — first sign-in test from you to confirm the redirect lands on `/onboarding`.
 
-- `src/lib/pdf/revisionPdf.ts`
-  - Add renderers: `renderPathwayRoadmap`, `renderTopicLesson`, `renderSolvedExamples`, `renderExamCorner`, plus compact variants `renderPathwayAtAGlance` and `renderExamHighlights` for the Quick Pack.
-  - Add `downloadQuickRevisionPackPdf({ grade, chapterTitle, cards, formulas, pathwayIndex, examCorner })`.
-  - Extend existing `downloadRevisionPackPdf` → renamed call-site "Full Pack" with optional `pathway`, `topicLessons`, `solvedExamples`, `examCorner`. Existing arg shape preserved by making the new fields optional, so any other caller keeps working.
-  - Add `downloadLearningPathwayPdf` + `downloadExamCornerPdf`.
-  - No changes to `renderConceptCards`, `renderFormulaSheet`, cover, divider, header, footer, watermark.
-- `src/components/chapter/ConceptCards.tsx`
-  - Replace single download button with **Quick Pack / Full Pack** controls.
-  - Orchestrate cache-first fetch with progress toast.
-  - Add per-tab "Download this section as PDF" buttons inside the Pathway / Solved / Exam Corner tabs.
-- `src/components/chapter/DeepLearning.tsx`
-  - Export a tiny `useDeepLearningCache(grade, chapter)` hook so `ConceptCards.tsx` can read / lazily fetch the payloads without duplicating logic.
-- No changes to `src/lib/quiz.functions.ts`. No migrations. No route changes.
-
-**Schema reuse** — All payloads already have Zod schemas in `quiz.functions.ts` (`PathwaySchema`, `TopicLessonSchema`, `SolvedExampleSchema`, `ExamCornerSchema`). PDF code reads from those typed shapes only.
-
-**Filenames**
-
-- `HBK-Maths_Grade-{n}_{chapter-slug}_Quick-Pack.pdf`
-- `HBK-Maths_Grade-{n}_{chapter-slug}_Full-Pack.pdf`
-
-## Open questions
-
-1. **Quick Pack — include model answers in Exam Highlights, or keep it answer-free for active recall?** Default I'd pick: **answer-free** (forces the student to attempt before checking the Full Pack), with a small footer line "Full answers in the Full Revision Pack".
-2. **Full Pack on cold cache** — fetch everything live with a progress UI (one click, slower), or refuse and ask the student to open the relevant tab first? Default: **fetch live** — one click should always work.
-3. **Page budget for Quick Pack** — hard-cap at 12 pages even if Concept Cards alone would overflow (e.g. very long chapter), or let it grow naturally? Default: **let it grow** — Quick Pack stays "short relative to Full", not strictly under N pages.
+Approve to start. I'll begin with the migration, then auth provider config, then UI.
