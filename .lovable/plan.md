@@ -1,93 +1,128 @@
-
 # Goal
 
-Add a **deep, tuition-class-grade learning layer** on top of the existing chapter experience — without removing or shrinking any current functionality. Concept cards, formula sheet, quizzes, worksheets, tutor, mistake explanations all stay exactly as they are. We **add** richer content and a structured topic-by-topic learning pathway.
+Offer **two downloadable PDFs** from every chapter, across all grades (1–10) and all chapters:
+
+1. **Quick Revision Pack** — short gist, fast to print, fits in a school bag. Concept Cards + Formula Sheet + a one-page summary of the Learning Pathway + the most-asked Exam Corner highlights. Roughly 6–12 pages.
+2. **Full Revision Pack** — the complete tuition handout. Concept Cards + Formula Sheet + full topic-by-topic Learning Pathway lessons + all Solved Examples + full Exam Corner. Roughly 30–60 pages depending on chapter density.
+
+Both are additive. The existing Concept Cards and Formula Sheet PDFs (already downloadable separately) stay exactly as they are.
 
 ---
 
-## 1. Topic-based learning pathway (the new "Theory & Concepts" surface)
+## 1. UI on the chapter page
 
-This is the centrepiece of the upgrade. Instead of dumping a wall of theory per chapter, every chapter gets broken into an ordered list of **topics** (sub-concepts), and each topic is taught in its own mini-lesson — the way a tuition teacher actually paces a chapter across multiple sittings.
+Inside `ConceptCards.tsx`, replace the single "Download Revision Pack" button with a small **download menu** (dropdown or two adjacent buttons):
 
-New server function `generateChapterPathway(grade, chapterTitle)` returns:
+- **Quick Pack (PDF)** — secondary button, lightning icon. Subtitle: "Cards + formulas + one-page summary".
+- **Full Pack (PDF)** — primary button, book icon. Subtitle: "Everything: pathway, solved examples, exam corner".
+
+The existing per-tab "Download this section" links stay for power users who want just one section.
+
+## 2. Quick Revision Pack — what's inside
+
+Designed to be the "exam-eve cheat sheet". Compact, dense, high signal.
 
 ```text
-Chapter → ordered Topics[]  (e.g. for Grade 10 Quadratic Equations:
-  1. What is a quadratic equation?
-  2. Standard form & roots
-  3. Solving by factorisation
-  4. Solving by completing the square
-  5. Quadratic formula & discriminant
-  6. Nature of roots
-  7. Word problems / applications)
+Cover  ▸  01 Concept Cards (compact 2-column, today's style)
+       ▸  02 Formula Sheet (today's style)
+       ▸  03 Pathway at a Glance     ← NEW, single page
+       ▸  04 Exam Highlights          ← NEW, 1–2 pages
 ```
 
-For each topic, a second function `generateTopicLesson(grade, chapterTitle, topicTitle)` produces a full mini-lesson:
+- **Pathway at a Glance** (1 page) — numbered list of all topics in the chapter, each with a one-line "what you'll learn" caption. No derivations, no worked examples. Acts as a study checklist.
+- **Exam Highlights** (1–2 pages) — top 4–6 PYQ / Board-pattern questions (Grades 9–10) or top tricky test questions (Grades 1–7), each as a tight card with the question, marks badge, and a 2–3 line "Examiner expects" cue. No full model answers in Quick Pack — keeps it short and forces active recall.
 
-- **Prerequisites** (with link back to which earlier chapter/topic to revise)
-- **Intuition** — why this concept exists, real-life analogy
-- **Definition / statement** — formal
-- **Derivation or proof** (Grades 8–10) / **Why it works visually** (Grades 1–7)
-- **2–3 fully worked examples**, easy → hard, each with method choice + steps + final answer
-- **Common mistakes** specific to this topic
-- **Practice check** — 2 quick self-check questions with answers hidden by default
-- **"What's next"** — pointer to the next topic in the pathway
+Routing: Quick Pack only needs the pathway *index* (already returned by `generateChapterPathway`) and the Exam Corner payload — **no per-topic lesson fetches**, so it's near-instant when Concept Cards + Formula Sheet are already cached.
 
-UI: a new **"Learning Pathway"** tab inside `ConceptCards.tsx` (added alongside existing "Concept cards" and "Formula sheet" tabs — neither is removed). The pathway renders as a vertical numbered roadmap; clicking a topic lazy-loads its lesson and marks it complete (stored in localStorage per grade/chapter/topic, so a student can resume).
+## 3. Full Revision Pack — what's inside
 
-A small **progress bar** above the roadmap shows "3 / 7 topics complete" — gives a real sense of progression through the chapter.
+```text
+Cover  ▸  01 Concept Cards
+       ▸  02 Formula Sheet
+       ▸  03 Learning Pathway      ← full mini-lessons, one topic per page(s)
+       ▸  04 Solved Examples       ← all 6–10 worked problems
+       ▸  05 Exam Corner           ← all questions + model answers + tips
+                                   (renamed "Test & Olympiad Corner" for Grades 1–7)
+```
 
-## 2. Two more additive deep-content surfaces
+Each new section gets the same premium treatment as today's two: dedicated section divider page (oversized numeral), watermark, headers, footers, pack ID, A4 layout, indigo→violet→gold palette.
 
-Same additive pattern — new tabs, no removal:
+### Learning Pathway rendering (Full Pack only)
 
-| New tab | New server fn | What it produces |
-|---|---|---|
-| **Solved Examples** | `generateSolvedExamples` | 6–10 fully worked problems graded easy → hard, each with given/to-find, method + why, step-by-step solution, alternate method where useful, boxed final answer. NCERT textbook style. |
-| **Exam Corner** | `generateExamCorner` | PYQ/Board-pattern questions (Grades 9–10), or school-test/Olympiad-style for lower grades. Includes marking-scheme hints, "what the examiner expects", time tips, most-asked sub-topics. |
+- Roadmap overview page (numbered vertical list with gold connector).
+- Then one mini-lesson per topic: Prerequisites · Intuition · Definition · Derivation/Why (becomes "Visual idea" for Grades 1–7) · 2–3 Worked Examples (Given/Method/Steps/Boxed answer) · Common Mistakes · Practice Check (answers in light grey below) · "What's next →".
 
-Both cached in localStorage per chapter, lazy-loaded on tab open.
+### Solved Examples rendering (Full Pack only)
 
-## 3. Prompt enrichment for existing surfaces (additive, not destructive)
+- Grouped Easy / Medium / Hard. Each card: Given · To find · Method (with rationale) · Step-by-step · Alternate method when present · Boxed final answer.
 
-Existing prompts stay; we **extend** them so the AI is allowed/required to go deeper when the field is present. No fields are removed from any schema.
+### Exam Corner rendering (Full Pack only)
 
-- `generateConceptCards` — add optional fields `derivation`, `prerequisites`, `relatedTopics` (rendered only when present). Existing `keyIdea / example / pitfall / examTip` stay.
-- `generateFormulaSheet` — add optional `derivation`, `conditions` (when valid / not valid), `commonMistake`, `relatedFormula`. Existing `name / formula / whenToUse` stay.
-- `generateChapterQuiz` — add a Bloom's mix instruction (recall / application / HOTS) and require 3–5 line method-showing explanations. Question count and structure unchanged.
-- `generateWorksheet` — keep current marks bands; add instruction that 5-mark questions should be Board-exam-style case studies with sub-parts (a)(b)(c).
-- `askTutor` — system prompt becomes a full tutor persona (teach the concept, then a worked example, then a check-for-understanding question). Existing chat UI unchanged.
-- `explainMistake` — append a "prerequisite to revise" pointer so a wrong answer routes the student to the right earlier topic in the pathway.
+- Question card with marks badge · "Examiner expects" callout · full model answer · time tip · source tag (CBSE PYQ / Exemplar / Board pattern). Grades 1–7 use difficulty badges + Olympiad-style hint where present. Section ends with "Most-asked sub-topics".
 
-Grade calibration runs through every prompt: Grades 1–5 use story / visual analogies (no formal derivations); Grades 6–8 introduce formal notation gently; Grades 9–10 use full Board-exam rigour with proper derivations and CBSE marking-scheme style. For Grades 1–7 "Exam Corner" becomes "Test & Olympiad Corner" since there's no Board exam.
+## 4. Data flow & caching
 
-## 4. Mastery-aware depth
+Both packs read from the **same localStorage cache** the in-app tabs already write to:
 
-`suggestDifficulty` already exists. Add `suggestStudentLevel` (beginner / developing / proficient) derived from the same mastery data, and pass it into the tutor + pathway prompts so a struggling student gets more scaffolding and prerequisite reminders, a proficient one gets harder variations and competitive-exam-style extensions. Default behaviour for new users is unchanged.
+- `pathway:{grade}:{chapter}` — pathway index (used by both packs)
+- `pathway-lesson:{grade}:{chapter}:{topic}` — per-topic lesson (Full Pack only)
+- `solved:{grade}:{chapter}` — solved examples (Full Pack only)
+- `exam:{grade}:{chapter}` — exam corner (both packs)
 
-## 5. Model routing
+Pack assembly logic:
 
-All deep-content generators (`generateChapterPathway`, `generateTopicLesson`, `generateSolvedExamples`, `generateExamCorner`) route to `MODEL_REASONING` (`google/gemini-2.5-pro`) since derivation/proof accuracy matters most. Quiz + worksheet bulk stays on `MODEL_FAST`. Existing routing unchanged.
+1. Check localStorage for every payload the pack needs.
+2. Anything missing is fetched live with a progress toast: "Building your Full Pack… (2/4 Pathway lessons, topic 3 of 7)".
+3. Per-topic lessons fetch in parallel, capped at 3 concurrent calls.
+4. If a section fails after retry, the PDF still generates with the rest and a small "Section unavailable — please retry" placeholder. The user never loses the other sections.
 
-## 6. PDF pack
+Quick Pack will almost always finish in seconds. Full Pack on a cold cache for a dense Grade 10 chapter can take ~20–40s — the progress toast makes that wait understandable.
 
-`downloadRevisionPackPdf` is **extended** (not replaced) to optionally append the Learning Pathway, Solved Examples, and Exam Corner sections when they're already cached, so the printable pack becomes a true tuition handout. Original cards + formulas sections remain identical.
+## 5. Grade calibration
+
+Handled upstream in the AI prompts (already in place). The PDF renderer only:
+
+- Renames Exam Corner heading to **"Test & Olympiad Corner"** when `grade <= 7`.
+- Renames the Derivation block to **"Visual idea"** when `grade <= 7`.
+
+## 6. Standalone per-section PDFs
+
+In addition to Quick / Full packs, keep the existing standalone downloads (`downloadConceptCardsPdf`, `downloadFormulaSheetPdf`) and add two thin helpers used by the new tabs:
+
+- `downloadLearningPathwayPdf` — cover + roadmap + all topic lessons.
+- `downloadExamCornerPdf` — cover + Exam Corner section only.
+
+So a student can print just one section without building either pack.
 
 ---
 
-## Files touched
+## Technical details
 
-- `src/lib/quiz.functions.ts` — **add** 4 new server functions, **extend** (not remove) 6 existing prompts/schemas with optional richer fields.
-- `src/components/chapter/ConceptCards.tsx` — **add** 3 new tabs (Learning Pathway, Solved Examples, Exam Corner). Existing tabs untouched.
-- `src/components/chapter/LearningPathway.tsx` — **new** component for the roadmap UI with per-topic completion tracking.
-- `src/lib/pdf/revisionPdf.ts` — extend the pack PDF with new sections.
-- `src/lib/mastery.ts` — add `suggestStudentLevel` helper. Existing exports unchanged.
-- `src/routes/tutor.tsx` — pass available grade + chapter context to `askTutor` (no UI change).
+**Files touched**
 
-No database migrations. No routes removed. No existing UI removed. Cache keys for the *modified* (additive) prompts bump from `v2` → `v3` so users see the richer output once; old caches simply re-fetch.
+- `src/lib/pdf/revisionPdf.ts`
+  - Add renderers: `renderPathwayRoadmap`, `renderTopicLesson`, `renderSolvedExamples`, `renderExamCorner`, plus compact variants `renderPathwayAtAGlance` and `renderExamHighlights` for the Quick Pack.
+  - Add `downloadQuickRevisionPackPdf({ grade, chapterTitle, cards, formulas, pathwayIndex, examCorner })`.
+  - Extend existing `downloadRevisionPackPdf` → renamed call-site "Full Pack" with optional `pathway`, `topicLessons`, `solvedExamples`, `examCorner`. Existing arg shape preserved by making the new fields optional, so any other caller keeps working.
+  - Add `downloadLearningPathwayPdf` + `downloadExamCornerPdf`.
+  - No changes to `renderConceptCards`, `renderFormulaSheet`, cover, divider, header, footer, watermark.
+- `src/components/chapter/ConceptCards.tsx`
+  - Replace single download button with **Quick Pack / Full Pack** controls.
+  - Orchestrate cache-first fetch with progress toast.
+  - Add per-tab "Download this section as PDF" buttons inside the Pathway / Solved / Exam Corner tabs.
+- `src/components/chapter/DeepLearning.tsx`
+  - Export a tiny `useDeepLearningCache(grade, chapter)` hook so `ConceptCards.tsx` can read / lazily fetch the payloads without duplicating logic.
+- No changes to `src/lib/quiz.functions.ts`. No migrations. No route changes.
+
+**Schema reuse** — All payloads already have Zod schemas in `quiz.functions.ts` (`PathwaySchema`, `TopicLessonSchema`, `SolvedExampleSchema`, `ExamCornerSchema`). PDF code reads from those typed shapes only.
+
+**Filenames**
+
+- `HBK-Maths_Grade-{n}_{chapter-slug}_Quick-Pack.pdf`
+- `HBK-Maths_Grade-{n}_{chapter-slug}_Full-Pack.pdf`
 
 ## Open questions
 
-1. **Pathway granularity** — should I aim for ~5–7 topics per chapter (concise) or ~8–12 (more granular)? I'll default to "as many as the NCERT chapter naturally has" unless you prefer a fixed range.
-2. **Olympiad/competitive content for Grades 9–10** — include NTSE / JEE-Foundation-style stretch questions in Exam Corner, or keep strictly to CBSE Board style?
-3. **Hinglish option** — keep all explanations English-only (current), or add a per-user toggle for Hinglish in the tutor + pathway lessons?
+1. **Quick Pack — include model answers in Exam Highlights, or keep it answer-free for active recall?** Default I'd pick: **answer-free** (forces the student to attempt before checking the Full Pack), with a small footer line "Full answers in the Full Revision Pack".
+2. **Full Pack on cold cache** — fetch everything live with a progress UI (one click, slower), or refuse and ask the student to open the relevant tab first? Default: **fetch live** — one click should always work.
+3. **Page budget for Quick Pack** — hard-cap at 12 pages even if Concept Cards alone would overflow (e.g. very long chapter), or let it grow naturally? Default: **let it grow** — Quick Pack stays "short relative to Full", not strictly under N pages.
