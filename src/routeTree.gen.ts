@@ -24,8 +24,10 @@ import { Route as DailyRouteImport } from './routes/daily'
 import { Route as CustomRouteImport } from './routes/custom'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as GradeGradeIdRouteImport } from './routes/grade.$gradeId'
+import { Route as BillingSuccessRouteImport } from './routes/billing.success'
 import { Route as FlashcardsGradeIdChapterIdRouteImport } from './routes/flashcards.$gradeId.$chapterId'
 import { Route as GradeGradeIdChapterChapterIdRouteImport } from './routes/grade.$gradeId.chapter.$chapterId'
+import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 
 const WorksheetRoute = WorksheetRouteImport.update({
   id: '/worksheet',
@@ -102,6 +104,11 @@ const GradeGradeIdRoute = GradeGradeIdRouteImport.update({
   path: '/grade/$gradeId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BillingSuccessRoute = BillingSuccessRouteImport.update({
+  id: '/billing/success',
+  path: '/billing/success',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FlashcardsGradeIdChapterIdRoute =
   FlashcardsGradeIdChapterIdRouteImport.update({
     id: '/flashcards/$gradeId/$chapterId',
@@ -113,6 +120,12 @@ const GradeGradeIdChapterChapterIdRoute =
     id: '/chapter/$chapterId',
     path: '/chapter/$chapterId',
     getParentRoute: () => GradeGradeIdRoute,
+  } as any)
+const ApiPublicPaymentsWebhookRoute =
+  ApiPublicPaymentsWebhookRouteImport.update({
+    id: '/api/public/payments/webhook',
+    path: '/api/public/payments/webhook',
+    getParentRoute: () => rootRouteImport,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -130,8 +143,10 @@ export interface FileRoutesByFullPath {
   '/revise': typeof ReviseRoute
   '/tutor': typeof TutorRoute
   '/worksheet': typeof WorksheetRoute
+  '/billing/success': typeof BillingSuccessRoute
   '/grade/$gradeId': typeof GradeGradeIdRouteWithChildren
   '/flashcards/$gradeId/$chapterId': typeof FlashcardsGradeIdChapterIdRoute
+  '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/grade/$gradeId/chapter/$chapterId': typeof GradeGradeIdChapterChapterIdRoute
 }
 export interface FileRoutesByTo {
@@ -149,8 +164,10 @@ export interface FileRoutesByTo {
   '/revise': typeof ReviseRoute
   '/tutor': typeof TutorRoute
   '/worksheet': typeof WorksheetRoute
+  '/billing/success': typeof BillingSuccessRoute
   '/grade/$gradeId': typeof GradeGradeIdRouteWithChildren
   '/flashcards/$gradeId/$chapterId': typeof FlashcardsGradeIdChapterIdRoute
+  '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/grade/$gradeId/chapter/$chapterId': typeof GradeGradeIdChapterChapterIdRoute
 }
 export interface FileRoutesById {
@@ -169,8 +186,10 @@ export interface FileRoutesById {
   '/revise': typeof ReviseRoute
   '/tutor': typeof TutorRoute
   '/worksheet': typeof WorksheetRoute
+  '/billing/success': typeof BillingSuccessRoute
   '/grade/$gradeId': typeof GradeGradeIdRouteWithChildren
   '/flashcards/$gradeId/$chapterId': typeof FlashcardsGradeIdChapterIdRoute
+  '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/grade/$gradeId/chapter/$chapterId': typeof GradeGradeIdChapterChapterIdRoute
 }
 export interface FileRouteTypes {
@@ -190,8 +209,10 @@ export interface FileRouteTypes {
     | '/revise'
     | '/tutor'
     | '/worksheet'
+    | '/billing/success'
     | '/grade/$gradeId'
     | '/flashcards/$gradeId/$chapterId'
+    | '/api/public/payments/webhook'
     | '/grade/$gradeId/chapter/$chapterId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -209,8 +230,10 @@ export interface FileRouteTypes {
     | '/revise'
     | '/tutor'
     | '/worksheet'
+    | '/billing/success'
     | '/grade/$gradeId'
     | '/flashcards/$gradeId/$chapterId'
+    | '/api/public/payments/webhook'
     | '/grade/$gradeId/chapter/$chapterId'
   id:
     | '__root__'
@@ -228,8 +251,10 @@ export interface FileRouteTypes {
     | '/revise'
     | '/tutor'
     | '/worksheet'
+    | '/billing/success'
     | '/grade/$gradeId'
     | '/flashcards/$gradeId/$chapterId'
+    | '/api/public/payments/webhook'
     | '/grade/$gradeId/chapter/$chapterId'
   fileRoutesById: FileRoutesById
 }
@@ -248,8 +273,10 @@ export interface RootRouteChildren {
   ReviseRoute: typeof ReviseRoute
   TutorRoute: typeof TutorRoute
   WorksheetRoute: typeof WorksheetRoute
+  BillingSuccessRoute: typeof BillingSuccessRoute
   GradeGradeIdRoute: typeof GradeGradeIdRouteWithChildren
   FlashcardsGradeIdChapterIdRoute: typeof FlashcardsGradeIdChapterIdRoute
+  ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -359,6 +386,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GradeGradeIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/billing/success': {
+      id: '/billing/success'
+      path: '/billing/success'
+      fullPath: '/billing/success'
+      preLoaderRoute: typeof BillingSuccessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/flashcards/$gradeId/$chapterId': {
       id: '/flashcards/$gradeId/$chapterId'
       path: '/flashcards/$gradeId/$chapterId'
@@ -372,6 +406,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/grade/$gradeId/chapter/$chapterId'
       preLoaderRoute: typeof GradeGradeIdChapterChapterIdRouteImport
       parentRoute: typeof GradeGradeIdRoute
+    }
+    '/api/public/payments/webhook': {
+      id: '/api/public/payments/webhook'
+      path: '/api/public/payments/webhook'
+      fullPath: '/api/public/payments/webhook'
+      preLoaderRoute: typeof ApiPublicPaymentsWebhookRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -403,8 +444,10 @@ const rootRouteChildren: RootRouteChildren = {
   ReviseRoute: ReviseRoute,
   TutorRoute: TutorRoute,
   WorksheetRoute: WorksheetRoute,
+  BillingSuccessRoute: BillingSuccessRoute,
   GradeGradeIdRoute: GradeGradeIdRouteWithChildren,
   FlashcardsGradeIdChapterIdRoute: FlashcardsGradeIdChapterIdRoute,
+  ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
