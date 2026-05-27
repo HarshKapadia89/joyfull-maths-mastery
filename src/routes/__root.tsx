@@ -116,7 +116,7 @@ import { SiteHeader } from "../components/SiteHeader";
 import { GuestBanner } from "../components/auth/GuestBanner";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "@tanstack/react-router";
+
 import { supabase } from "../integrations/supabase/client";
 import { Toaster } from "../components/ui/sonner";
 
