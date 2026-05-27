@@ -10,13 +10,13 @@ import {
   Zap,
   Layers,
   Download,
-  FileDown,
   Map,
   BookText,
   GraduationCap,
   Zap as Lightning,
   BookMarked,
 } from "lucide-react";
+
 import {
   generateConceptCards,
   generateFormulaSheet,
