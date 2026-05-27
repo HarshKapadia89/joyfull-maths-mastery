@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   type StripeEnv,
@@ -10,8 +9,6 @@ import {
 type CheckoutResult = { clientSecret: string } | { error: string };
 type PortalResult = { url: string } | { error: string };
 type ChangeResult = { success: true } | { error: string };
-
-const admin = () => supabaseAdmin;
 
 async function resolveCustomer(
   stripe: ReturnType<typeof createStripeClient>,
@@ -118,7 +115,7 @@ export const changeSubscriptionPlan = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<ChangeResult> => {
     try {
       const { userId } = context;
-      const { data: sub } = await admin()
+      const { data: sub } = await context.supabase
         .from("subscriptions")
         .select("stripe_subscription_id, price_id")
         .eq("user_id", userId)
@@ -157,7 +154,7 @@ export const cancelSubscription = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<ChangeResult> => {
     try {
       const { userId } = context;
-      const { data: sub } = await admin()
+      const { data: sub } = await context.supabase
         .from("subscriptions")
         .select("stripe_subscription_id")
         .eq("user_id", userId)
