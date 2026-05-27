@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       profiles: {
         Row: {
+          billing_interval: string | null
           chapters: Json
           concept_stars: number
           created_at: string
@@ -27,12 +28,15 @@ export type Database = {
           phone: string | null
           problem_stars: number
           streak: number
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
           subscription_expires_at: string | null
           subscription_tier: string
           updated_at: string
           xp: number
         }
         Insert: {
+          billing_interval?: string | null
           chapters?: Json
           concept_stars?: number
           created_at?: string
@@ -44,12 +48,15 @@ export type Database = {
           phone?: string | null
           problem_stars?: number
           streak?: number
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           subscription_expires_at?: string | null
           subscription_tier?: string
           updated_at?: string
           xp?: number
         }
         Update: {
+          billing_interval?: string | null
           chapters?: Json
           concept_stars?: number
           created_at?: string
@@ -61,10 +68,36 @@ export type Database = {
           phone?: string | null
           problem_stars?: number
           streak?: number
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           subscription_expires_at?: string | null
           subscription_tier?: string
           updated_at?: string
           xp?: number
+        }
+        Relationships: []
+      }
+      usage_counters: {
+        Row: {
+          count: number
+          date: string
+          feature: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          count?: number
+          date?: string
+          feature: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          count?: number
+          date?: string
+          feature?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -73,7 +106,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment_usage: {
+        Args: { _feature: string; _limit: number }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
