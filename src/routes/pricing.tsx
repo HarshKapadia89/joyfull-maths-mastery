@@ -135,7 +135,7 @@ function Pricing() {
         setErrorMsg(result.error);
         return;
       }
-      navigate({ to: "/billing/success", search: {} });
+      navigate({ to: "/billing/success", search: { session_id: undefined } });
       return;
     }
 
