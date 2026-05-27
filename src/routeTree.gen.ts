@@ -13,9 +13,13 @@ import { Route as WorksheetRouteImport } from './routes/worksheet'
 import { Route as TutorRouteImport } from './routes/tutor'
 import { Route as ReviseRouteImport } from './routes/revise'
 import { Route as ProgressRouteImport } from './routes/progress'
+import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as ParentRouteImport } from './routes/parent'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as MockRouteImport } from './routes/mock'
 import { Route as MisconceptionsRouteImport } from './routes/misconceptions'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as DailyRouteImport } from './routes/daily'
 import { Route as CustomRouteImport } from './routes/custom'
 import { Route as IndexRouteImport } from './routes/index'
@@ -43,9 +47,19 @@ const ProgressRoute = ProgressRouteImport.update({
   path: '/progress',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ParentRoute = ParentRouteImport.update({
   id: '/parent',
   path: '/parent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MockRoute = MockRouteImport.update({
@@ -56,6 +70,16 @@ const MockRoute = MockRouteImport.update({
 const MisconceptionsRoute = MisconceptionsRouteImport.update({
   id: '/misconceptions',
   path: '/misconceptions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DailyRoute = DailyRouteImport.update({
@@ -95,9 +119,13 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/custom': typeof CustomRoute
   '/daily': typeof DailyRoute
+  '/dashboard': typeof DashboardRoute
+  '/login': typeof LoginRoute
   '/misconceptions': typeof MisconceptionsRoute
   '/mock': typeof MockRoute
+  '/onboarding': typeof OnboardingRoute
   '/parent': typeof ParentRoute
+  '/pricing': typeof PricingRoute
   '/progress': typeof ProgressRoute
   '/revise': typeof ReviseRoute
   '/tutor': typeof TutorRoute
@@ -110,9 +138,13 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/custom': typeof CustomRoute
   '/daily': typeof DailyRoute
+  '/dashboard': typeof DashboardRoute
+  '/login': typeof LoginRoute
   '/misconceptions': typeof MisconceptionsRoute
   '/mock': typeof MockRoute
+  '/onboarding': typeof OnboardingRoute
   '/parent': typeof ParentRoute
+  '/pricing': typeof PricingRoute
   '/progress': typeof ProgressRoute
   '/revise': typeof ReviseRoute
   '/tutor': typeof TutorRoute
@@ -126,9 +158,13 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/custom': typeof CustomRoute
   '/daily': typeof DailyRoute
+  '/dashboard': typeof DashboardRoute
+  '/login': typeof LoginRoute
   '/misconceptions': typeof MisconceptionsRoute
   '/mock': typeof MockRoute
+  '/onboarding': typeof OnboardingRoute
   '/parent': typeof ParentRoute
+  '/pricing': typeof PricingRoute
   '/progress': typeof ProgressRoute
   '/revise': typeof ReviseRoute
   '/tutor': typeof TutorRoute
@@ -143,9 +179,13 @@ export interface FileRouteTypes {
     | '/'
     | '/custom'
     | '/daily'
+    | '/dashboard'
+    | '/login'
     | '/misconceptions'
     | '/mock'
+    | '/onboarding'
     | '/parent'
+    | '/pricing'
     | '/progress'
     | '/revise'
     | '/tutor'
@@ -158,9 +198,13 @@ export interface FileRouteTypes {
     | '/'
     | '/custom'
     | '/daily'
+    | '/dashboard'
+    | '/login'
     | '/misconceptions'
     | '/mock'
+    | '/onboarding'
     | '/parent'
+    | '/pricing'
     | '/progress'
     | '/revise'
     | '/tutor'
@@ -173,9 +217,13 @@ export interface FileRouteTypes {
     | '/'
     | '/custom'
     | '/daily'
+    | '/dashboard'
+    | '/login'
     | '/misconceptions'
     | '/mock'
+    | '/onboarding'
     | '/parent'
+    | '/pricing'
     | '/progress'
     | '/revise'
     | '/tutor'
@@ -189,9 +237,13 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CustomRoute: typeof CustomRoute
   DailyRoute: typeof DailyRoute
+  DashboardRoute: typeof DashboardRoute
+  LoginRoute: typeof LoginRoute
   MisconceptionsRoute: typeof MisconceptionsRoute
   MockRoute: typeof MockRoute
+  OnboardingRoute: typeof OnboardingRoute
   ParentRoute: typeof ParentRoute
+  PricingRoute: typeof PricingRoute
   ProgressRoute: typeof ProgressRoute
   ReviseRoute: typeof ReviseRoute
   TutorRoute: typeof TutorRoute
@@ -230,11 +282,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProgressRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/parent': {
       id: '/parent'
       path: '/parent'
       fullPath: '/parent'
       preLoaderRoute: typeof ParentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mock': {
@@ -249,6 +315,20 @@ declare module '@tanstack/react-router' {
       path: '/misconceptions'
       fullPath: '/misconceptions'
       preLoaderRoute: typeof MisconceptionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/daily': {
@@ -312,9 +392,13 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CustomRoute: CustomRoute,
   DailyRoute: DailyRoute,
+  DashboardRoute: DashboardRoute,
+  LoginRoute: LoginRoute,
   MisconceptionsRoute: MisconceptionsRoute,
   MockRoute: MockRoute,
+  OnboardingRoute: OnboardingRoute,
   ParentRoute: ParentRoute,
+  PricingRoute: PricingRoute,
   ProgressRoute: ProgressRoute,
   ReviseRoute: ReviseRoute,
   TutorRoute: TutorRoute,
