@@ -1,6 +1,14 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import type { ConceptCard, Formula } from "@/lib/quiz.functions";
+import type {
+  ConceptCard,
+  Formula,
+  PathwayTopic,
+  TopicLesson,
+  SolvedExample,
+  ExamQuestion,
+} from "@/lib/quiz.functions";
+
 
 const SCHOOL = "The H. B. Kapadia New High School";
 const TAGLINE = "HBK Maths Quest · Learn smart. Revise smarter.";
