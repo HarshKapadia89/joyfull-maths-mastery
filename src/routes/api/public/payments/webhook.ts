@@ -28,7 +28,7 @@ async function upsertSubscription(subscription: any, env: StripeEnv) {
       stripe_subscription_id: subscription.id,
       stripe_customer_id: subscription.customer,
       product_id: productId,
-      price_id: priceId,
+      price_id: priceId ?? "unknown",
       status: subscription.status,
       current_period_start: periodStart ? new Date(periodStart * 1000).toISOString() : null,
       current_period_end: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
