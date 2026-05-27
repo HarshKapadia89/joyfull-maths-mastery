@@ -18,6 +18,10 @@ export type ProfileDTO = {
   phone: string | null;
   subscription_tier: "free" | "plus" | "pro" | "family";
   subscription_expires_at: string | null;
+  billing_interval: "monthly" | "annual" | null;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  cancel_at_period_end?: boolean;
   xp: number;
   streak: number;
   last_active_date: string | null;
