@@ -656,10 +656,7 @@ export function ConceptCards({
             </>
           )}
 
-          {/* Render the unused FileDown icon to satisfy lint */}
-          <span className="sr-only" aria-hidden>
-            <FileDown className="h-0 w-0" />
-          </span>
+
         </div>
       )}
     </div>
